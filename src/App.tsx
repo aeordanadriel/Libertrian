@@ -1232,6 +1232,31 @@ export default function App() {
     if (!companionChatInput.trim()) return;
     const userMsg = companionChatInput;
     
+    const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
+    const isOrch = agentId === activeOrch.id;
+
+    if (isOrch) {
+      setMessages((prev) => [...prev, { sender: "User", text: userMsg }]);
+      setCompanionChatInput("");
+      setIsAgentTyping(true);
+
+      invoke<any>("analyze_portfolio", { message: userMsg })
+        .then((agentMsg) => {
+          setMessages((prev) => [...prev, agentMsg]);
+        })
+        .catch((err) => {
+          console.error("Failed to run agent simulation:", err);
+          setMessages((prev) => [
+            ...prev,
+            { sender: "System", text: `Error calling backend: ${err}` }
+          ]);
+        })
+        .finally(() => {
+          setIsAgentTyping(false);
+        });
+      return;
+    }
+
     setAiAgents(prev => prev.map(agent => {
       if (agent.id === agentId) {
         return {
@@ -3089,6 +3114,9 @@ export default function App() {
       ? "w-0 overflow-hidden opacity-0 hover:w-[3.75rem] hover:opacity-100 hover:px-2 transition-all duration-300"
       : "w-[3.75rem] px-1 items-center";
 
+  const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
+  const orchName = activeOrch ? activeOrch.name : "Orchestrator";
+
   return (
     <div className={`flex flex-col h-screen w-screen transition-colors duration-200 overflow-hidden font-sans ${tc.bg} ${tc.text}`}>
       
@@ -3129,7 +3157,7 @@ export default function App() {
               { icon: TrendingUp, label: "Market" },
               { icon: FolderHeart, label: "Portfolio" },
               { icon: Clock, label: "Prep" },
-              { icon: CrownedBotIcon, label: "Orchestrator" },
+              { icon: CrownedBotIcon, label: orchName },
               { icon: Bot, label: "Agent" }
             ].map((tab, idx) => {
               const IconComponent = tab.icon;
@@ -4301,21 +4329,33 @@ export default function App() {
                   <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
                     <div className="flex items-center gap-2">
                       <AgentMascot name={activeOrch.name} className="w-5 h-5 flex-shrink-0 animate-pulse" />
-                      <span className="flex items-center gap-1.5">
+                      <span className="font-bold flex items-center gap-1.5">
                         <span style={{ color: orchColor }}>👑</span>
-                        <span>Orchestrator Terminal ({activeOrch.name})</span>
+                        <span>{activeOrch.name}</span>
                       </span>
                     </div>
-                    <span 
-                      style={{
-                        color: orchColor,
-                        borderColor: `${orchColor}30`,
-                        backgroundColor: `${orchColor}10`
-                      }}
-                      className="text-[9px] px-1.5 py-0.5 rounded border font-bold"
-                    >
-                      Primary coordinator
-                    </span>
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => {
+                          setActiveCompanionChatAgentId(activeOrch.id);
+                        }}
+                        className="text-[10px] font-bold text-gray-450 hover:text-emerald-500 transition-colors flex items-center gap-1.5 cursor-pointer mr-4"
+                        title="Pop-out Companion Chat"
+                      >
+                        <CompanionIcon className="w-3.5 h-3.5" />
+                        <span>Companion Chat</span>
+                      </button>
+                      <span 
+                        style={{
+                          color: orchColor,
+                          borderColor: `${orchColor}30`,
+                          backgroundColor: `${orchColor}10`
+                        }}
+                        className="text-[9px] px-1.5 py-0.5 rounded border font-bold"
+                      >
+                        Primary coordinator
+                      </span>
+                    </div>
                   </span>
                   
                   {/* Message Log */}
@@ -4440,7 +4480,7 @@ export default function App() {
                           <AgentMascot name={agent.name} className="w-10 h-10 flex-shrink-0" />
                           <div className="flex flex-col min-w-0">
                             <span className="text-xs font-bold truncate flex items-center gap-1">
-                              {isOrch && <span title="Orchestrator" style={{ color: orchColor }}>👑</span>}
+                              {isOrch && <span title={agent.name} style={{ color: orchColor }}>👑</span>}
                               <span>{agent.name}</span>
                             </span>
                             <span className="text-[9px] text-gray-400 font-semibold truncate uppercase tracking-wider">{agent.aiModel}</span>
@@ -4472,34 +4512,48 @@ export default function App() {
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                             isOrch ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-emerald-500/10 text-emerald-500"
                           }`}>
-                            {isOrch ? "King / Orchestrator" : "Sub-Agent"}
+                            {isOrch ? `👑 ${agent.name}` : "Sub-Agent"}
                           </span>
                           {agent.cron && (
                             <span className="text-[9px] font-mono text-gray-400 dark:text-zinc-550">{agent.cron}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setPreferencesActiveSection(`ai_config_${agent.id}`);
-                              setShowPreferencesModal(true);
-                              setIsSettingsDockedToSidebar(false);
-                            }}
-                            title="Configure"
-                            className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActiveAgentChatId(agent.id);
-                            }}
-                            className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <span>Chat</span>
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </div>
+                           <button
+                             onClick={() => {
+                               setPreferencesActiveSection(`ai_config_${agent.id}`);
+                               setShowPreferencesModal(true);
+                               setIsSettingsDockedToSidebar(false);
+                             }}
+                             title="Configure"
+                             className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                           >
+                             <Settings className="w-3.5 h-3.5" />
+                           </button>
+                           <button
+                             onClick={() => {
+                               setActiveCompanionChatAgentId(agent.id);
+                             }}
+                             title="Open Companion Chat"
+                             className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded text-gray-400 dark:text-zinc-500 hover:text-emerald-500 transition-colors cursor-pointer"
+                           >
+                             <CompanionIcon className="w-3.5 h-3.5" />
+                           </button>
+                           <button
+                             onClick={() => {
+                               if (isOrch) {
+                                 setActiveAgentChatId(null);
+                                 setActiveTab(4);
+                               } else {
+                                 setActiveAgentChatId(agent.id);
+                               }
+                             }}
+                             className={`text-[10px] font-bold flex items-center gap-0.5 cursor-pointer ${isOrch ? "text-amber-500 hover:text-amber-600" : "text-emerald-500 hover:text-emerald-600"}`}
+                           >
+                             <span>{isOrch ? "Terminal" : "Chat"}</span>
+                             <ChevronRight className="w-3 h-3" />
+                           </button>
+                         </div>
                       </div>
                     </div>
                   );
@@ -5199,6 +5253,17 @@ export default function App() {
         const agent = aiAgents.find(a => a.id === activeCompanionChatAgentId);
         if (!agent) return null;
 
+        const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
+        const isOrchCompanion = agent.id === activeOrch.id;
+        const orchColor = activeOrch.orchestratorColor || "#f59e0b";
+
+        const companionMessages = isOrchCompanion 
+          ? messages.map(m => ({
+              sender: m.sender === "User" ? "user" : (m.sender === "System" ? "system" : "agent"),
+              text: m.text
+            }))
+          : agent.chatHistory;
+
         return (
           <div
             style={{
@@ -5207,6 +5272,9 @@ export default function App() {
               top: `${companionChatPos.y}px`,
               width: "370px",
               height: "500px",
+              borderColor: isOrchCompanion ? orchColor : undefined,
+              boxShadow: isOrchCompanion ? `0 10px 30px ${orchColor}20` : undefined,
+              borderWidth: isOrchCompanion ? "2px" : "1px"
             }}
             className="z-[999] bg-gray-50/95 dark:bg-zinc-900/95 border border-gray-250 dark:border-zinc-800 rounded-[28px] shadow-2xl flex flex-col overflow-hidden backdrop-blur-md font-sans text-xs select-none"
           >
@@ -5237,14 +5305,21 @@ export default function App() {
               {/* Title / Agent Name */}
               <div className="flex items-center gap-1.5 pointer-events-none">
                 <AgentMascot name={agent.name} className="w-4 h-4 flex-shrink-0" />
-                <span className="font-bold text-gray-700 dark:text-zinc-200">{agent.name} Companion</span>
+                <span className="font-bold text-gray-700 dark:text-zinc-200 flex items-center gap-1">
+                  {isOrchCompanion && <span style={{ color: orchColor }}>👑</span>}
+                  <span>{agent.name} Companion</span>
+                </span>
               </div>
 
               {/* Top-Right Controls */}
               <div className="flex items-center gap-1.5" onMouseDown={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => {
-                    setActiveAgentChatId(activeCompanionChatAgentId);
+                    if (isOrchCompanion) {
+                      setActiveTab(4);
+                    } else {
+                      setActiveAgentChatId(activeCompanionChatAgentId);
+                    }
                     setActiveCompanionChatAgentId(null);
                   }}
                   title="Open in Main Window (⌘O)"
@@ -5252,31 +5327,35 @@ export default function App() {
                 >
                   <CompanionIcon className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => {
-                    setPreferencesActiveSection(`ai_config_${activeCompanionChatAgentId}`);
-                    setShowPreferencesModal(true);
-                    setIsSettingsDockedToSidebar(false);
-                  }}
-                  title="Configure Agent"
-                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
-                >
-                  <SquarePen className="w-4 h-4" />
-                </button>
+                {!isOrchCompanion && (
+                  <button
+                    onClick={() => {
+                      setPreferencesActiveSection(`ai_config_${activeCompanionChatAgentId}`);
+                      setShowPreferencesModal(true);
+                      setIsSettingsDockedToSidebar(false);
+                    }}
+                    title="Configure Agent"
+                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
+                  >
+                    <SquarePen className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Conversation Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-[#18181b]">
-              {agent.chatHistory.map((msg, idx) => (
+              {companionMessages.map((msg, idx) => (
                 <div key={idx} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
                   <span className="text-[8.5px] text-gray-400 dark:text-zinc-500 font-bold mb-0.5">
-                    {msg.sender === "user" ? "You" : agent.name}
+                    {msg.sender === "user" ? "You" : (msg.sender === "system" ? "System" : agent.name)}
                   </span>
                   <div className={`px-3 py-2 rounded-xl max-w-[85%] leading-relaxed ${
                     msg.sender === "user"
                       ? "bg-emerald-500 text-white font-semibold rounded-tr-none"
-                      : "bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-150 rounded-tl-none font-medium"
+                      : msg.sender === "system"
+                        ? "bg-zinc-100 dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-450 rounded-tl-none font-medium"
+                        : "bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-150 rounded-tl-none font-medium"
                   }`}>
                     {msg.text}
                   </div>
@@ -5295,10 +5374,10 @@ export default function App() {
             {/* Bottom Actions & Input Panel */}
             <div className="p-3 bg-[#fafafa] dark:bg-[#121214] border-t border-gray-200 dark:border-zinc-800 flex flex-col gap-2">
               {/* Utility Row: Copy, Volume/TTS, Refresh */}
-              <div className="flex items-center gap-3 px-1.5 text-gray-400 dark:text-zinc-500">
+              <div className="flex items-center gap-3 px-1.5 text-gray-400 dark:text-[#a1a1aa]">
                 <button
                   onClick={() => {
-                    const lastMsg = agent.chatHistory[agent.chatHistory.length - 1];
+                    const lastMsg = companionMessages[companionMessages.length - 1];
                     if (lastMsg) navigator.clipboard.writeText(lastMsg.text);
                   }}
                   title="Copy last response"
@@ -5308,7 +5387,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    const lastMsg = agent.chatHistory[agent.chatHistory.length - 1];
+                    const lastMsg = companionMessages[companionMessages.length - 1];
                     if (lastMsg) {
                       const utterance = new SpeechSynthesisUtterance(lastMsg.text);
                       window.speechSynthesis.speak(utterance);
@@ -5321,17 +5400,23 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    setAiAgents(prev => prev.map(a => {
-                      if (a.id === activeCompanionChatAgentId) {
-                        return {
-                          ...a,
-                          chatHistory: [
-                            { sender: "agent", text: "Conversation history reloaded and sync state cleared." }
-                          ]
-                        };
-                      }
-                      return a;
-                    }));
+                    if (isOrchCompanion) {
+                      setMessages([
+                        { sender: "System", text: "Orchestrator session reloaded and sync state cleared." }
+                      ]);
+                    } else {
+                      setAiAgents(prev => prev.map(a => {
+                        if (a.id === activeCompanionChatAgentId) {
+                          return {
+                            ...a,
+                            chatHistory: [
+                              { sender: "agent", text: "Conversation history reloaded and sync state cleared." }
+                            ]
+                          };
+                        }
+                        return a;
+                      }));
+                    }
                   }}
                   title="Reset history"
                   className="hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"

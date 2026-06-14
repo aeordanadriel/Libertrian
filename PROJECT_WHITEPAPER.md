@@ -336,7 +336,7 @@ Redesigned the agent 1-on-1 workspace header with a Back button and PinOff icon 
 
 ---
 
-## Entry 14 — Pinned Orchestrator with Crown & Sidebar Divider Polish
+## Entry 14 — Orchestrator Rename, Companion Mode Integration & Polish
 
 **Date:** 2026-06-14
 **Developer:** Antigravity (AI)
@@ -344,18 +344,22 @@ Redesigned the agent 1-on-1 workspace header with a Back button and PinOff icon 
 **Model:** Gemini 3.5 Flash | **Effort:** Medium
 
 ### Summary
-Reorganized the sidebar tabs to add a dedicated AI Agent Orchestrator view directly beneath "Prep" styled with a custom crowned robot mascot and gold active indicators. Visually distinguished the active orchestrator agent (Sarah) across the main dashboard, workspace headers, and chat message headers with gold borders/shadows and crown icons. Upgraded the sidebar divider lines to be highly visible in both light and dark modes.
+Reorganized the sidebar tabs to add a dedicated Orchestrator view directly beneath "Prep" using a custom crowned robot mascot. Visually highlighted the active orchestrator agent (Sarah) across the main dashboard, workspace headers, and chat messages. Dynamically renamed all "Orchestrator" text (tab labels, tooltips, terminal headers) to the active agent's name (e.g. "Sarah"). Enabled full companion pop-out mode for the Orchestrator Terminal with synchronized query execution. Upgraded the sidebar divider lines for high visibility.
 
 ### Technical Details
 - **Crowned Robot Mascot & Tab Placement:**
   - Added a custom `CrownedBotIcon` SVG component rendering a golden crown above the robot.
   - Inserted the Orchestrator Tab directly below `Prep` (as Tab 4, index 4), shifting the main AI Agent Dashboard to Tab 5 (index 5) and the global Settings view to Tab 6 (index 6).
   - Designed gold tab active states (`text-amber-500` / active indicator bar `bg-amber-500`) for the Orchestrator tab in the left sidebar.
-- **Orchestrator Visual Highlights:**
-  - Applied gold borders (`border-[#f59e0b]` / `border-amber-400`) and subtle gold drop-shadows to the active orchestrator agent's grid card on the AI Agent Dashboard.
-  - Displayed a gold crown (`👑`) next to the orchestrator's name in the dashboard grid card, workspace header, and chat message bubble headers.
-  - Custom-tailored the Orchestrator Terminal view with primary coordinator badges and a gold border matching the active agent's brand colors.
-- **High-Visibility Dividers:**
-  - Upgraded the three vertical sidebar dividers in the layout to use a darker, higher-contrast shade (`bg-zinc-300 dark:bg-zinc-700/85`) to guarantee clear readability in both light and dark themes.
+- **Dynamic Orchestrator Renaming:**
+  - Mapped the sidebar tab label and tooltips to resolve dynamically to the active orchestrator's name (e.g. "Sarah" instead of the generic string "Orchestrator").
+  - Changed the title of the Orchestrator Terminal console to display only the active agent's name (`Sarah`), utilizing the crown badge for role identification.
+- **Orchestrator Companion Mode:**
+  - Added a "Companion Chat" button in the Orchestrator Terminal header, which transitions the user back to the dashboard and launches the draggable floating companion.
+  - Custom-styled the orchestrator's companion window with a gold accent border, crown badges, and specialized message rendering.
+  - Routed message sending in orchestrator companion mode to call the Tauri backend `analyze_portfolio` command and synchronized message logging.
+- **Visual Highlights & Dividers:**
+  - Applied gold borders (`border-[#f59e0b]` / `border-amber-400`) and gold drop-shadows to the active orchestrator agent's grid card on the AI Agent Dashboard.
+  - Upgraded the three vertical sidebar dividers to use `bg-zinc-300 dark:bg-zinc-700/85` for high visibility.
 
 
