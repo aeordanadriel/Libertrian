@@ -362,4 +362,29 @@ Reorganized the sidebar tabs to add a dedicated Orchestrator view directly benea
   - Applied gold borders (`border-[#f59e0b]` / `border-amber-400`) and gold drop-shadows to the active orchestrator agent's grid card on the AI Agent Dashboard.
   - Upgraded the three vertical sidebar dividers to use `bg-zinc-300 dark:bg-zinc-700/85` for high visibility.
 
+---
+
+## Entry 15 — Security Seals & Biometric Lock Screens for AI Agents
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 3.5 Flash | **Effort:** High
+
+### Summary
+Designed and implemented an interactive biometric security "Seal" overlay allowing users to lock their active Orchestrator (Sarah) or individual sub-agents behind fingerprint authentication screens. Configured two seal types (Fully Sealed vs. Orchestrator-Tethered Trust) and embedded lock controls on both the Dashboard cards and inside the AI Config modal.
+
+### Technical Details
+- **Biometric Lockscreen Overlay Component:**
+  - Built a `<BiometricLockOverlay>` component featuring a glassmorphic blurred backdrop (`backdrop-blur-xl`), user-verification text, and an interactive Hold-to-Scan fingerprint scanner button.
+  - Designed keyframe animations for active scanning lasers and circular progress ring path indicators that fill dynamically as the scanner is pressed.
+  - Supported cancel hooks (`onClose`) and success verification states.
+- **Unified Workspace Protection:**
+  - Protected the Orchestrator Terminal (`Tab 4`) and any sub-agent workspace view (`activeAgentChatId`) with the lockscreen overlay if the targeted agent is currently sealed.
+  - Integrated biometric authentication directly into the floating Companion Chat Panel, locking access to message history until credentials are held and verified.
+- **Card Controls & State Management:**
+  - Rendered glowing lock status indicators next to the agent's name in their dashboard cards.
+  - Added quick-toggle seal buttons directly on the cards, allowing immediate locks or launching the fingerprint scanner screen for session-unlock.
+  - Added new configuration sections in the Settings/Preferences Modal to manage the security seal states and customize the seal trust type.
+
 

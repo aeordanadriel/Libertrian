@@ -41,7 +41,8 @@ import {
   Mic,
   FileText,
   X,
-  Copy
+  Copy,
+  Lock
 } from "lucide-react";
 
 // Orange mascot avatar component
@@ -88,6 +89,208 @@ function CrownedBotIcon({ className = "w-5 h-5" }: { className?: string }) {
       <path d="M16 15h.01" strokeWidth="3" />
       <path d="M9 18h6" />
     </svg>
+  );
+}
+
+
+function BiometricLockOverlay({ 
+  agentName, 
+  color = "#10b981", 
+  onUnlock,
+  onClose
+}: { 
+  agentName: string; 
+  color?: string; 
+  onUnlock: () => void; 
+  onClose?: () => void;
+}) {
+  const [progress, setProgress] = useState(0);
+  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'success'>('idle');
+  const timerRef = useRef<any>(null);
+
+  const startScanning = () => {
+    if (scanState === 'success') return;
+    setScanState('scanning');
+    setProgress(0);
+    
+    const startTime = Date.now();
+    const duration = 1200; // 1.2 seconds to scan
+
+    const update = () => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min((elapsed / duration) * 100, 100);
+      setProgress(pct);
+
+      if (pct < 100) {
+        timerRef.current = requestAnimationFrame(update);
+      } else {
+        setScanState('success');
+        // Small delay for success animation before unlocking
+        setTimeout(() => {
+          onUnlock();
+        }, 500);
+      }
+    };
+    timerRef.current = requestAnimationFrame(update);
+  };
+
+  const stopScanning = () => {
+    if (scanState === 'success') return;
+    if (timerRef.current) {
+      cancelAnimationFrame(timerRef.current);
+    }
+    setScanState('idle');
+    // Smoothly drain progress back to 0
+    let currentProgress = progress;
+    const drain = () => {
+      currentProgress = Math.max(currentProgress - 8, 0);
+      setProgress(currentProgress);
+      if (currentProgress > 0) {
+        timerRef.current = requestAnimationFrame(drain);
+      }
+    };
+    timerRef.current = requestAnimationFrame(drain);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) cancelAnimationFrame(timerRef.current);
+    };
+  }, []);
+
+  const strokeDashoffset = 251.2 - (251.2 * progress) / 100;
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-xl bg-[#fafafa]/80 dark:bg-zinc-950/80 font-sans p-6 text-center select-none animate-fade-in">
+      <div className="max-w-md w-full p-8 rounded-3xl bg-white/70 dark:bg-zinc-900/70 border border-gray-200 dark:border-zinc-800/80 shadow-2xl flex flex-col items-center relative overflow-hidden backdrop-blur-md animate-[scale-up_0.3s_ease-out]">
+        
+        {/* Close button */}
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer z-10"
+            title="Cancel"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Floating background indicator */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: color }} />
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: color }} />
+
+        {/* Lock icon badge */}
+        <div 
+          style={{ backgroundColor: `${color}15`, borderColor: `${color}30` }}
+          className="w-12 h-12 rounded-2xl border flex items-center justify-center mb-6 shadow-sm"
+        >
+          <Lock className="w-5 h-5" style={{ color }} />
+        </div>
+
+        <h3 className="text-base font-bold text-gray-800 dark:text-zinc-100 mb-1">
+          Access Seal Active
+        </h3>
+        <p className="text-[11px] text-gray-405 dark:text-zinc-400 mb-8 max-w-[260px] leading-relaxed">
+          Unlock workspace for <strong className="font-semibold text-gray-700 dark:text-zinc-200">{agentName}</strong> using biometric verification.
+        </p>
+
+        {/* Outer Scanner Ring & Fingerprint button */}
+        <div className="relative w-32 h-32 flex items-center justify-center mb-8">
+          
+          {/* Circular SVG Progress Ring */}
+          <svg className="absolute w-full h-full rotate-[-90deg]">
+            {/* Background track circle */}
+            <circle
+              cx="64"
+              cy="64"
+              r="40"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              fill="transparent"
+              className="text-gray-100 dark:text-zinc-800"
+            />
+            {/* Foreground progress circle */}
+            <circle
+              cx="64"
+              cy="64"
+              r="40"
+              stroke={scanState === 'success' ? '#10b981' : color}
+              strokeWidth="4"
+              fill="transparent"
+              strokeDasharray="251.2"
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-75"
+            />
+          </svg>
+
+          {/* Interactive fingerprint button */}
+          <button
+            onMouseDown={startScanning}
+            onMouseUp={stopScanning}
+            onMouseLeave={stopScanning}
+            onTouchStart={(e) => { e.preventDefault(); startScanning(); }}
+            onTouchEnd={stopScanning}
+            style={{ 
+              borderColor: scanState === 'success' ? '#10b981' : (scanState === 'scanning' ? color : 'currentColor'),
+              boxShadow: scanState === 'scanning' ? `0 0 20px ${color}35` : undefined
+            }}
+            className={`w-20 h-20 rounded-full border-2 flex items-center justify-center bg-gray-50 dark:bg-zinc-800/60 transition-all duration-300 relative overflow-hidden active:scale-95 cursor-pointer ${
+              scanState === 'scanning' ? 'text-gray-900 dark:text-white border-zinc-300 dark:border-zinc-700' : 'text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300'
+            }`}
+          >
+            {/* Laser scan line overlay */}
+            {scanState === 'scanning' && (
+              <div 
+                style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
+                className="absolute left-0 right-0 h-0.5 animate-[scan_1.5s_ease-in-out_infinite]"
+              />
+            )}
+
+            {scanState === 'success' ? (
+              <Check className="w-8 h-8 text-emerald-500 animate-[scale-up_0.2s_ease-out]" />
+            ) : (
+              <Fingerprint 
+                className={`w-8 h-8 transition-transform duration-300 ${scanState === 'scanning' ? 'scale-110' : ''}`}
+                style={{ color: scanState === 'scanning' ? color : undefined }}
+              />
+            )}
+          </button>
+        </div>
+
+        {/* Status text */}
+        <div className="text-[10.5px] font-bold tracking-wider uppercase h-4">
+          {scanState === 'idle' && (
+            <span className="text-gray-400 dark:text-zinc-500">
+              Press and hold to scan
+            </span>
+          )}
+          {scanState === 'scanning' && (
+            <span className="animate-pulse" style={{ color }}>
+              Verifying credentials... {Math.round(progress)}%
+            </span>
+          )}
+          {scanState === 'success' && (
+            <span className="text-emerald-500 animate-[bounce_0.5s_infinite]">
+              Identity Verified
+            </span>
+          )}
+        </div>
+
+      </div>
+      
+      {/* Dynamic Keyframes inject */}
+      <style>{`
+        @keyframes scan {
+          0%, 100% { top: 10%; }
+          50% { top: 90%; }
+        }
+        @keyframes scale-up {
+          0% { transform: scale(0.5); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -382,6 +585,8 @@ export default function App() {
     aiApiKey: string;
     isOrchestrator?: boolean;
     orchestratorColor?: string;
+    isLocked?: boolean;
+    sealType?: 'fully_sealed' | 'orchestrator_tethered';
   }
 
   const [aiAgents, setAiAgents] = useState<AIAgent[]>([
@@ -397,7 +602,9 @@ export default function App() {
       aiModel: "claude-3-5-sonnet",
       aiApiKey: "",
       isOrchestrator: true,
-      orchestratorColor: "#f59e0b"
+      orchestratorColor: "#f59e0b",
+      isLocked: false,
+      sealType: 'fully_sealed'
     },
     {
       id: "bilbo",
@@ -411,7 +618,9 @@ export default function App() {
       aiModel: "gpt-4o",
       aiApiKey: "",
       isOrchestrator: false,
-      orchestratorColor: "#f59e0b"
+      orchestratorColor: "#f59e0b",
+      isLocked: false,
+      sealType: 'fully_sealed'
     },
     {
       id: "gemini",
@@ -425,7 +634,9 @@ export default function App() {
       aiModel: "claude-3-5-sonnet",
       aiApiKey: "",
       isOrchestrator: false,
-      orchestratorColor: "#f59e0b"
+      orchestratorColor: "#f59e0b",
+      isLocked: false,
+      sealType: 'fully_sealed'
     }
   ]);
 
@@ -464,6 +675,8 @@ export default function App() {
 
   const [pinnedAgentIds, setPinnedAgentIds] = useState<string[]>([]);
   const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
+  const [unlockedAgentIds, setUnlockedAgentIds] = useState<string[]>([]);
+  const [verifyingAgentId, setVerifyingAgentId] = useState<string | null>(null);
 
   // Companion Chat floating window states & refs
   const [activeCompanionChatAgentId, setActiveCompanionChatAgentId] = useState<string | null>(null);
@@ -503,6 +716,23 @@ export default function App() {
   const renderPinnedAgentWorkspace = (agentId: string) => {
     const agent = aiAgents.find(a => a.id === agentId);
     if (!agent) return <div className="p-4 text-xs text-rose-500">Agent not found</div>;
+
+    const isAgentLocked = agent.isLocked && !unlockedAgentIds.includes(agent.id);
+    if (isAgentLocked) {
+      return (
+        <div className="flex-1 h-full w-full relative bg-white dark:bg-[#09090b] p-4">
+          <div className="w-full h-full rounded-lg border border-gray-250 dark:border-[#27272a] relative overflow-hidden">
+            <BiometricLockOverlay
+              agentName={agent.name}
+              color={agent.isOrchestrator ? agent.orchestratorColor || "#f59e0b" : "#10b981"}
+              onUnlock={() => {
+                setUnlockedAgentIds(prev => [...prev, agent.id]);
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex h-full w-full overflow-hidden p-4 gap-4 bg-white dark:bg-[#09090b] font-sans">
@@ -1733,6 +1963,55 @@ export default function App() {
                   );
                 })}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Security Seal Settings */}
+        <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-900/20 flex-shrink-0 flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h4 className="text-xs font-bold text-gray-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" /> Security Seal Configuration
+              </h4>
+              <p className="text-[10px] text-gray-400 font-medium">Protect this agent behind a biometric lock screen shield.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                updateAgent({ isLocked: !agent.isLocked });
+                if (agent.isLocked) {
+                  setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                }
+              }}
+              className={`px-3 py-1.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                agent.isLocked
+                  ? "bg-rose-500 hover:bg-rose-600 text-white shadow-sm"
+                  : "border border-gray-300 dark:border-zinc-700 text-gray-500 hover:text-gray-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {agent.isLocked ? "Seal Engaged" : "Activate Seal"}
+            </button>
+          </div>
+
+          {agent.isLocked && (
+            <div className="flex flex-col border-t border-zinc-100 dark:border-zinc-800/80 pt-2.5 gap-2.5 animate-[scale-up_0.2s_ease-out]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Seal Type Mode</span>
+                <select
+                  value={agent.sealType || "fully_sealed"}
+                  onChange={(e) => updateAgent({ sealType: e.target.value as any })}
+                  className={`px-2 py-1 text-[10.5px] rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
+                >
+                  <option value="fully_sealed">Fully Sealed (Strict)</option>
+                  <option value="orchestrator_tethered">Orchestrator-Tethered (Trust)</option>
+                </select>
+              </div>
+              <p className="text-[9.5px] text-gray-450 dark:text-zinc-500 italic leading-relaxed">
+                {agent.sealType === "orchestrator_tethered" 
+                  ? "Allows this agent to process queries from the active Orchestrator in the background without prompting you, while direct chats remain sealed."
+                  : "Requires a biometric authentication scan for any direct chat access, background triggers, or terminal interactions."}
+              </p>
             </div>
           )}
         </div>
@@ -4318,6 +4597,21 @@ export default function App() {
           {!activeAgentChatId && activeTab === 4 && (() => {
             const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
             const orchColor = activeOrch.orchestratorColor || "#f59e0b";
+            const isOrchLocked = activeOrch.isLocked && !unlockedAgentIds.includes(activeOrch.id);
+
+            if (isOrchLocked) {
+              return (
+                <div className="flex-1 h-full w-full relative bg-white dark:bg-[#09090b]">
+                  <BiometricLockOverlay
+                    agentName={activeOrch.name}
+                    color={orchColor}
+                    onUnlock={() => {
+                      setUnlockedAgentIds(prev => [...prev, activeOrch.id]);
+                    }}
+                  />
+                </div>
+              );
+            }
 
             return (
               <div className="flex h-full w-full p-4 gap-4 overflow-hidden font-sans bg-white dark:bg-[#09090b]">
@@ -4479,8 +4773,19 @@ export default function App() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <AgentMascot name={agent.name} className="w-10 h-10 flex-shrink-0" />
                           <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold truncate flex items-center gap-1">
+                            <span className="text-xs font-bold truncate flex items-center gap-1.5">
                               {isOrch && <span title={agent.name} style={{ color: orchColor }}>👑</span>}
+                              {agent.isLocked && (
+                                <span title={!unlockedAgentIds.includes(agent.id) ? "Seal engaged (Locked)" : "Seal unlocked (Session active)"}>
+                                  <Lock 
+                                    className={`w-3 h-3 flex-shrink-0 ${
+                                      !unlockedAgentIds.includes(agent.id) 
+                                        ? (isOrch ? "text-amber-500 animate-pulse" : "text-rose-400 animate-pulse") 
+                                        : "text-emerald-555"
+                                    }`} 
+                                  />
+                                </span>
+                              )}
                               <span>{agent.name}</span>
                             </span>
                             <span className="text-[9px] text-gray-400 font-semibold truncate uppercase tracking-wider">{agent.aiModel}</span>
@@ -4532,6 +4837,26 @@ export default function App() {
                            </button>
                            <button
                              onClick={() => {
+                               if (agent.isLocked) {
+                                 setVerifyingAgentId(agent.id);
+                               } else {
+                                 setAiAgents(prev => prev.map(a => 
+                                   a.id === agent.id ? { ...a, isLocked: true } : a
+                                 ));
+                                 setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                               }
+                             }}
+                             title={agent.isLocked ? "Unlock Security Seal" : "Engage Security Seal"}
+                             className={`p-1 rounded transition-colors cursor-pointer ${
+                               agent.isLocked 
+                                 ? (isOrch ? "text-amber-500 hover:text-amber-600 bg-amber-500/10" : "text-rose-450 hover:text-rose-500 bg-rose-500/10")
+                                 : "text-gray-400 dark:text-zinc-500 hover:text-gray-750 dark:hover:text-zinc-250"
+                             }`}
+                           >
+                             <Lock className="w-3.5 h-3.5" />
+                           </button>
+                           <button
+                             onClick={() => {
                                setActiveCompanionChatAgentId(agent.id);
                              }}
                              title="Open Companion Chat"
@@ -4574,6 +4899,25 @@ export default function App() {
                   <span className="text-xs font-bold text-gray-450 group-hover:text-emerald-500 transition-colors">Deploy New Agent</span>
                 </button>
               </div>
+
+              {/* Biometric verification overlay for unlocking seal from Dashboard */}
+              {verifyingAgentId && (() => {
+                const targetAgent = aiAgents.find(a => a.id === verifyingAgentId);
+                if (!targetAgent) return null;
+                return (
+                  <BiometricLockOverlay
+                    agentName={targetAgent.name}
+                    color={targetAgent.isOrchestrator ? targetAgent.orchestratorColor || "#f59e0b" : "#10b981"}
+                    onUnlock={() => {
+                      setAiAgents(prev => prev.map(a => 
+                        a.id === targetAgent.id ? { ...a, isLocked: false } : a
+                      ));
+                      setVerifyingAgentId(null);
+                    }}
+                    onClose={() => setVerifyingAgentId(null)}
+                  />
+                );
+              })()}
             </div>
           )}
 
@@ -5256,6 +5600,34 @@ export default function App() {
         const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
         const isOrchCompanion = agent.id === activeOrch.id;
         const orchColor = activeOrch.orchestratorColor || "#f59e0b";
+
+        const isAgentLocked = agent.isLocked && !unlockedAgentIds.includes(agent.id);
+        if (isAgentLocked) {
+          return (
+            <div
+              style={{
+                position: "fixed",
+                left: `${companionChatPos.x}px`,
+                top: `${companionChatPos.y}px`,
+                width: "370px",
+                height: "500px",
+                borderColor: isOrchCompanion ? orchColor : undefined,
+                boxShadow: isOrchCompanion ? `0 10px 30px ${orchColor}20` : undefined,
+                borderWidth: isOrchCompanion ? "2px" : "1px"
+              }}
+              className="z-[999] bg-gray-50/95 dark:bg-zinc-900/95 border border-gray-250 dark:border-zinc-800 rounded-[28px] shadow-2xl flex flex-col overflow-hidden backdrop-blur-md font-sans text-xs select-none"
+            >
+              <BiometricLockOverlay
+                agentName={agent.name}
+                color={isOrchCompanion ? orchColor : "#10b981"}
+                onUnlock={() => {
+                  setUnlockedAgentIds(prev => [...prev, agent.id]);
+                }}
+                onClose={() => setActiveCompanionChatAgentId(null)}
+              />
+            </div>
+          );
+        }
 
         const companionMessages = isOrchCompanion 
           ? messages.map(m => ({
