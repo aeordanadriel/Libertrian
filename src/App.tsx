@@ -76,29 +76,21 @@ function CompanionIcon({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-function OrchestratorMascot({ className = "w-9 h-9" }: { className?: string }) {
+function CrownedBotIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      {/* Outer Circle background - dark emerald/zinc cyber fill */}
-      <circle cx="50" cy="50" r="50" fill="#022c22" />
-      {/* Glowing border */}
-      <circle cx="50" cy="50" r="47" stroke="#10b981" strokeWidth="4" />
-      {/* Neon/White ears/horns on top */}
-      <path d="M26 25 C20 12, 38 12, 38 25 Z" fill="#10b981" />
-      <path d="M74 25 C80 12, 62 12, 62 25 Z" fill="#10b981" />
-      {/* Cyber mask face */}
-      <path d="M18 52 C18 35, 82 35, 82 52 C82 70, 70 82, 50 82 C30 82, 18 70, 18 52 Z" fill="#064e3b" />
-      {/* Eyes background (glowing green/white) */}
-      <circle cx="36" cy="48" r="10" fill="#10b981" />
-      <circle cx="64" cy="48" r="10" fill="#10b981" />
-      {/* Pupils (white glowing spark) */}
-      <circle cx="36" cy="48" r="3.5" fill="#FFF" />
-      <circle cx="64" cy="48" r="3.5" fill="#FFF" />
-      {/* Sleek cyber mouth/lines */}
-      <path d="M42 62 h16" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {/* Crown on top */}
+      <path d="M6 3 L9 6 L12 2.5 L15 6 L18 3 L17 8 L7 8 Z" fill="#f59e0b" stroke="#f59e0b" strokeWidth="0.8" />
+      {/* Robot body/head */}
+      <rect x="3" y="10" width="18" height="11" rx="2.5" />
+      <path d="M12 8v2" />
+      <path d="M8 15h.01" strokeWidth="3" />
+      <path d="M16 15h.01" strokeWidth="3" />
+      <path d="M9 18h6" />
     </svg>
   );
 }
+
 
 function AgentMascot({ name, className = "w-8 h-8" }: { name: string; className?: string }) {
   // Generate a deterministic background and primary color based on the agent's name
@@ -388,6 +380,8 @@ export default function App() {
     aiProvider: string;
     aiModel: string;
     aiApiKey: string;
+    isOrchestrator?: boolean;
+    orchestratorColor?: string;
   }
 
   const [aiAgents, setAiAgents] = useState<AIAgent[]>([
@@ -401,7 +395,9 @@ export default function App() {
       ],
       aiProvider: "anthropic",
       aiModel: "claude-3-5-sonnet",
-      aiApiKey: ""
+      aiApiKey: "",
+      isOrchestrator: true,
+      orchestratorColor: "#f59e0b"
     },
     {
       id: "bilbo",
@@ -413,7 +409,9 @@ export default function App() {
       ],
       aiProvider: "openai",
       aiModel: "gpt-4o",
-      aiApiKey: ""
+      aiApiKey: "",
+      isOrchestrator: false,
+      orchestratorColor: "#f59e0b"
     },
     {
       id: "gemini",
@@ -425,7 +423,9 @@ export default function App() {
       ],
       aiProvider: "anthropic",
       aiModel: "claude-3-5-sonnet",
-      aiApiKey: ""
+      aiApiKey: "",
+      isOrchestrator: false,
+      orchestratorColor: "#f59e0b"
     }
   ]);
 
@@ -519,7 +519,10 @@ export default function App() {
                 <ArrowLeft className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
               </button>
               <AgentMascot name={agent.name} className="w-5 h-5 flex-shrink-0 animate-pulse" />
-              <span className="font-bold">{agent.name} Workspace</span>
+              <span className="font-bold flex items-center gap-1.5">
+                {agent.isOrchestrator && <span style={{ color: agent.orchestratorColor || "#f59e0b" }}>👑</span>}
+                <span>{agent.name} Workspace</span>
+              </span>
             </div>
             <div className="flex items-center">
               <button
@@ -550,8 +553,8 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
             {agent.chatHistory.map((msg, idx) => (
               <div key={idx} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
-                <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-bold mb-0.5">
-                  {msg.sender === "user" ? "You" : agent.name}
+                <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-bold mb-0.5 flex items-center gap-0.5">
+                  {msg.sender === "user" ? "You" : (agent.isOrchestrator ? `👑 ${agent.name}` : agent.name)}
                 </span>
                 <div className={`px-3 py-2 rounded-lg max-w-[80%] leading-relaxed ${
                   msg.sender === "user" 
@@ -564,7 +567,9 @@ export default function App() {
             ))}
             {isAgentTyping && (
               <div className="flex flex-col items-start">
-                <span className="text-[9px] text-gray-400 dark:text-zinc-550 font-bold mb-0.5">{agent.name}</span>
+                <span className="text-[9px] text-gray-400 dark:text-zinc-555 font-bold mb-0.5 flex items-center gap-0.5">
+                  {agent.isOrchestrator ? `👑 ${agent.name}` : agent.name}
+                </span>
                 <div className="px-3 py-2 rounded-lg bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-400 rounded-tl-none italic animate-pulse">
                   typing...
                 </div>
@@ -1649,6 +1654,62 @@ export default function App() {
               <Send className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+
+        {/* Orchestrator Config */}
+        <div className="border border-amber-500/20 rounded-lg p-3 bg-amber-500/[0.02] flex-shrink-0 flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h4 className="text-xs font-bold text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                <span>👑</span> Orchestrator Agent Role
+              </h4>
+              <p className="text-[10px] text-gray-400 font-medium">Designate this agent as the primary coordinator for the Orchestrator Terminal.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setAiAgents(prev => prev.map(a => ({
+                  ...a,
+                  isOrchestrator: a.id === agentId ? !a.isOrchestrator : false
+                })));
+              }}
+              className={`px-3 py-1.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                agent.isOrchestrator
+                  ? "bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                  : "border border-gray-300 dark:border-zinc-700 text-gray-500 hover:text-gray-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {agent.isOrchestrator ? "Active Orchestrator" : "Promote as Orchestrator"}
+            </button>
+          </div>
+
+          {agent.isOrchestrator && (
+            <div className="flex items-center justify-between border-t border-amber-500/10 pt-2.5">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">Orchestrator Theme Highlight</span>
+              <div className="flex gap-2">
+                {[
+                  { name: "Gold", hex: "#f59e0b", class: "bg-amber-500 border-amber-300" },
+                  { name: "Orange", hex: "#f97316", class: "bg-orange-500 border-orange-300" },
+                  { name: "Red", hex: "#ef4444", class: "bg-red-500 border-red-300" },
+                  { name: "Green", hex: "#10b981", class: "bg-emerald-500 border-emerald-300" },
+                  { name: "Blue", hex: "#3b82f6", class: "bg-blue-500 border-blue-300" }
+                ].map(c => {
+                  const isActiveColor = agent.orchestratorColor === c.hex || (!agent.orchestratorColor && c.name === "Gold");
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => updateAgent({ orchestratorColor: c.hex })}
+                      title={c.name}
+                      className={`w-5 h-5 rounded-full border cursor-pointer transition-all ${c.class} ${
+                        isActiveColor ? "ring-2 ring-offset-2 ring-amber-500 scale-110" : "opacity-60 hover:opacity-100"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Danger Zone */}
@@ -3068,10 +3129,12 @@ export default function App() {
               { icon: TrendingUp, label: "Market" },
               { icon: FolderHeart, label: "Portfolio" },
               { icon: Clock, label: "Prep" },
+              { icon: CrownedBotIcon, label: "Orchestrator" },
               { icon: Bot, label: "Agent" }
             ].map((tab, idx) => {
               const IconComponent = tab.icon;
               const isActive = activeTab === idx && !activeAgentChatId;
+              const isOrchTab = idx === 4;
               return (
                 <button
                   key={tab.label}
@@ -3091,12 +3154,12 @@ export default function App() {
                   }`}
                 >
                   {isActive && (
-                    <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
+                    <div className={`absolute left-0 w-[3px] h-6 rounded-r ${isOrchTab ? "bg-amber-500" : "bg-emerald-500"}`} />
                   )}
-                  <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-emerald-500" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                  <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? (isOrchTab ? "text-amber-500" : "text-emerald-500") : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
                   
                   {menuBarIconStyle === "full" && (
-                    <span className={`text-[11px] font-bold transition-colors ${isActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
+                    <span className={`text-[11px] font-bold transition-colors ${isActive ? (isOrchTab ? "text-amber-500 font-extrabold" : "text-emerald-500 font-extrabold") : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
                       {tab.label}
                     </span>
                   )}
@@ -3107,7 +3170,7 @@ export default function App() {
             {/* Pinned Agents Section */}
             {pinnedAgentIds.length > 0 && (
               <>
-                <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+                <div className="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700/85 mx-auto my-1 flex-shrink-0" />
                 {pinnedAgentIds.map(agentId => {
                   const agent = aiAgents.find(a => a.id === agentId);
                   if (!agent) return null;
@@ -3145,13 +3208,11 @@ export default function App() {
             )}
 
             {/* Settings Tab */}
-            <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+            <div className="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700/85 mx-auto my-1 flex-shrink-0" />
             <button
               onClick={() => {
                 setActiveAgentChatId(null);
-                setPreferencesActiveSection("general_basic");
-                setShowPreferencesModal(true);
-                setIsSettingsDockedToSidebar(false);
+                setActiveTab(6);
                 setHoveredTooltip(null);
               }}
               onMouseEnter={(e) => {
@@ -3164,9 +3225,12 @@ export default function App() {
                 menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
               }`}
             >
-              <Settings className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white" />
+              {activeTab === 6 && !activeAgentChatId && (
+                <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
+              )}
+              <Settings className={`w-5 h-5 flex-shrink-0 transition-colors ${activeTab === 6 && !activeAgentChatId ? "text-emerald-500" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
               {menuBarIconStyle === "full" && (
-                <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
+                <span className={`text-[11px] font-bold transition-colors ${activeTab === 6 && !activeAgentChatId ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
                   Settings
                 </span>
               )}
@@ -3229,7 +3293,7 @@ export default function App() {
             </button>
 
             {/* Centered Short Divider */}
-            <div className="w-8 h-[1px] bg-gray-200 dark:bg-zinc-800 mx-auto my-1 flex-shrink-0" />
+            <div className="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700/85 mx-auto my-1 flex-shrink-0" />
 
             {/* Profile Badge */}
             <div 
@@ -4222,88 +4286,36 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 4: AI Analyst */}
-          {!activeAgentChatId && activeTab === 4 && (
-            <div className="flex flex-col h-full w-full p-4 gap-4 overflow-hidden font-sans">
-              
-              {/* Horizontal Pinned Agent Dashboard Panel */}
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Deployed AI Agents</span>
-                <div className="flex gap-3.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-zinc-800">
-                  {aiAgents.map(agent => {
-                    const isPinned = pinnedAgentIds.includes(agent.id);
-                    return (
-                      <div key={agent.id} className="min-w-[210px] max-w-[240px] p-3 rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-950/20 flex flex-col justify-between flex-shrink-0 transition-shadow hover:shadow-sm">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <AgentMascot name={agent.name} className="w-8 h-8 flex-shrink-0" />
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-xs font-bold truncate">{agent.name}</span>
-                              <span className="text-[9px] text-gray-400 font-semibold truncate">{agent.aiModel}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Pin / Unpin Toggle */}
-                          <button
-                            onClick={() => {
-                              setPinnedAgentIds(prev => 
-                                prev.includes(agent.id) 
-                                  ? prev.filter(id => id !== agent.id) 
-                                  : [...prev, agent.id]
-                              );
-                            }}
-                            title={isPinned ? "Unpin from Sidebar" : "Pin to Sidebar"}
-                            className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors ${isPinned ? "text-emerald-500" : "text-gray-400"}`}
-                          >
-                            <Star className="w-3.5 h-3.5 fill-current" style={{ fillOpacity: isPinned ? 1 : 0 }} />
-                          </button>
-                        </div>
-                        
-                        <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 line-clamp-2 min-h-[28px] font-medium leading-relaxed">
-                          {agent.instructions}
-                        </p>
-                        
-                        <div className="mt-3 flex justify-between items-center">
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">Active</span>
-                          <button
-                            onClick={() => {
-                              setActiveAgentChatId(agent.id);
-                            }}
-                            className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <span>Chat</span>
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Plus card to deploy new agent */}
-                  <button
-                    onClick={() => {
-                      setPreferencesActiveSection("ai_new_agent");
-                      setShowPreferencesModal(true);
-                      setIsSettingsDockedToSidebar(false);
-                    }}
-                    className="min-w-[150px] p-3 rounded-lg border border-dashed border-gray-300 dark:border-zinc-800 hover:border-emerald-500/50 bg-transparent flex flex-col items-center justify-center gap-1.5 flex-shrink-0 transition-colors cursor-pointer group"
-                  >
-                    <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                    <span className="text-[10px] font-bold text-gray-400 group-hover:text-emerald-500 transition-colors">Deploy Agent</span>
-                  </button>
-                </div>
-              </div>
+          {/* Tab 4: AI Agent Orchestrator */}
+          {!activeAgentChatId && activeTab === 4 && (() => {
+            const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
+            const orchColor = activeOrch.orchestratorColor || "#f59e0b";
 
-              {/* Lower Section: Orchestrator Terminal & Reports */}
-              <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+            return (
+              <div className="flex h-full w-full p-4 gap-4 overflow-hidden font-sans bg-white dark:bg-[#09090b]">
                 {/* Chat Console */}
-                <div className="flex-1 h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden">
+                <div 
+                  style={{ borderColor: `${orchColor}30` }}
+                  className="flex-1 h-full rounded-lg border bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden"
+                >
                   <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
                     <div className="flex items-center gap-2">
-                      <OrchestratorMascot className="w-5 h-5 flex-shrink-0" />
-                      <span>Orchestrator Terminal</span>
+                      <AgentMascot name={activeOrch.name} className="w-5 h-5 flex-shrink-0 animate-pulse" />
+                      <span className="flex items-center gap-1.5">
+                        <span style={{ color: orchColor }}>👑</span>
+                        <span>Orchestrator Terminal ({activeOrch.name})</span>
+                      </span>
                     </div>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">Main Hub</span>
+                    <span 
+                      style={{
+                        color: orchColor,
+                        borderColor: `${orchColor}30`,
+                        backgroundColor: `${orchColor}10`
+                      }}
+                      className="text-[9px] px-1.5 py-0.5 rounded border font-bold"
+                    >
+                      Primary coordinator
+                    </span>
                   </span>
                   
                   {/* Message Log */}
@@ -4314,16 +4326,27 @@ export default function App() {
                       return (
                         <div key={idx} className={`flex w-full gap-2.5 ${isUser ? "justify-end" : "justify-start"}`}>
                           {!isUser && !isSystem && (
-                            <OrchestratorMascot className="w-7 h-7 rounded-full flex-shrink-0 mt-0.5" />
+                            <AgentMascot name={activeOrch.name} className="w-7 h-7 rounded-full flex-shrink-0 mt-0.5" />
                           )}
                           {isSystem && (
                             <div className="w-7 h-7 flex items-center justify-center text-gray-400 dark:text-zinc-500 flex-shrink-0">
                               <Info className="w-4 h-4" />
                             </div>
                           )}
-                          <div className={`max-w-[80%] p-3 rounded-lg border text-xs leading-relaxed ${isUser ? "bg-emerald-500/10 border-emerald-500 text-black dark:text-[#f4f4f5]" : isSystem ? "bg-zinc-100 dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-gray-400" : "bg-white dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-black dark:text-[#f4f4f5]"}`}>
+                          <div className={`max-w-[80%] p-3 rounded-lg border text-xs leading-relaxed ${
+                            isUser 
+                              ? "bg-emerald-500/10 border-emerald-500 text-black dark:text-[#f4f4f5]" 
+                              : isSystem 
+                                ? "bg-zinc-100 dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-gray-400" 
+                                : "bg-white dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-black dark:text-[#f4f4f5]"
+                          }`}>
                             <div className="flex items-center gap-1.5 font-bold mb-1 border-b border-gray-100 dark:border-zinc-800 pb-0.5">
-                              <span className={isUser ? "text-emerald-500" : "text-emerald-600 dark:text-emerald-400"}>{msg.sender}</span>
+                              <span 
+                                style={{ color: !isUser && !isSystem ? orchColor : undefined }}
+                                className={isUser ? "text-emerald-500" : ""}
+                              >
+                                {!isUser && !isSystem ? `👑 ${activeOrch.name}` : msg.sender}
+                              </span>
                             </div>
                             <p className="whitespace-pre-line font-medium">{msg.text}</p>
                           </div>
@@ -4336,7 +4359,7 @@ export default function App() {
                   <div className="p-3 border-t border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex gap-2">
                     <input 
                       type="text" 
-                      placeholder="Ask Orchestrator to run portfolio queries or query sub-agents..."
+                      placeholder={`Ask ${activeOrch.name} to run queries or delegate to sub-agents...`}
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -4381,11 +4404,127 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            );
+          })()}
+
+          {/* Tab 5: AI Agent Dashboard */}
+          {!activeAgentChatId && activeTab === 5 && (
+            <div className="flex flex-col h-full w-full p-6 gap-6 overflow-y-auto font-sans bg-white dark:bg-[#09090b]">
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <Bot className="w-6 h-6 text-emerald-500" />
+                  <span>AI Agent Dashboard</span>
+                </h1>
+                <p className="text-sm text-gray-400 dark:text-[#a1a1aa] mt-1">Deploy, monitor, and configure your specialized AI agents.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-shrink-0">
+                {aiAgents.map(agent => {
+                  const isPinned = pinnedAgentIds.includes(agent.id);
+                  const isOrch = agent.isOrchestrator;
+                  const orchColor = agent.orchestratorColor || "#f59e0b";
+                  return (
+                    <div
+                      key={agent.id}
+                      style={{
+                        borderColor: isOrch ? orchColor : undefined,
+                        boxShadow: isOrch ? `0 0 12px ${orchColor}20` : undefined,
+                        borderWidth: isOrch ? "2px" : "1px"
+                      }}
+                      className={`p-4 rounded-xl border bg-gray-50/50 dark:bg-zinc-950/20 flex flex-col justify-between transition-all hover:shadow-md ${
+                        isOrch ? "" : "border-gray-200 dark:border-[#27272a]"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <AgentMascot name={agent.name} className="w-10 h-10 flex-shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold truncate flex items-center gap-1">
+                              {isOrch && <span title="Orchestrator" style={{ color: orchColor }}>👑</span>}
+                              <span>{agent.name}</span>
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-semibold truncate uppercase tracking-wider">{agent.aiModel}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Pin / Unpin Toggle */}
+                        <button
+                          onClick={() => {
+                            setPinnedAgentIds(prev => 
+                              prev.includes(agent.id) 
+                                ? prev.filter(id => id !== agent.id) 
+                                : [...prev, agent.id]
+                            );
+                          }}
+                          title={isPinned ? "Unpin from Sidebar" : "Pin to Sidebar"}
+                          className={`p-1.5 rounded hover:bg-gray-150 dark:hover:bg-zinc-800 cursor-pointer transition-colors ${isPinned ? "text-emerald-500" : "text-gray-400"}`}
+                        >
+                          <Star className="w-4 h-4 fill-current" style={{ fillOpacity: isPinned ? 1 : 0 }} />
+                        </button>
+                      </div>
+                      
+                      <p className="text-[10.5px] text-gray-500 dark:text-zinc-400 mt-3.5 line-clamp-3 min-h-[42px] font-medium leading-relaxed">
+                        {agent.instructions}
+                      </p>
+                      
+                      <div className="mt-4 pt-3 border-t border-gray-200/50 dark:border-zinc-800/50 flex justify-between items-center">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                            isOrch ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-emerald-500/10 text-emerald-500"
+                          }`}>
+                            {isOrch ? "King / Orchestrator" : "Sub-Agent"}
+                          </span>
+                          {agent.cron && (
+                            <span className="text-[9px] font-mono text-gray-400 dark:text-zinc-550">{agent.cron}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setPreferencesActiveSection(`ai_config_${agent.id}`);
+                              setShowPreferencesModal(true);
+                              setIsSettingsDockedToSidebar(false);
+                            }}
+                            title="Configure"
+                            className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveAgentChatId(agent.id);
+                            }}
+                            className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>Chat</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Plus card to deploy new agent */}
+                <button
+                  onClick={() => {
+                    setPreferencesActiveSection("ai_new_agent");
+                    setShowPreferencesModal(true);
+                    setIsSettingsDockedToSidebar(false);
+                  }}
+                  className="min-h-[160px] p-5 rounded-xl border border-dashed border-gray-300 dark:border-zinc-800 hover:border-emerald-500/50 hover:bg-emerald-500/[0.01] bg-transparent flex flex-col items-center justify-center gap-2.5 transition-colors cursor-pointer group"
+                >
+                  <div className="p-3 rounded-full bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 group-hover:border-emerald-500/35 transition-colors">
+                    <Plus className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                  </div>
+                  <span className="text-xs font-bold text-gray-450 group-hover:text-emerald-500 transition-colors">Deploy New Agent</span>
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Tab 5: Settings */}
-          {activeTab === 5 && (
+          {/* Tab 6: Settings */}
+          {activeTab === 6 && (
             <div className="flex flex-col p-6 gap-6 max-w-6xl mx-auto w-full">
               <div>
                 <h1 className="text-2xl font-bold">Settings</h1>

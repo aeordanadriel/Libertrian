@@ -334,4 +334,28 @@ Redesigned the agent 1-on-1 workspace header with a Back button and PinOff icon 
   - Rendered a premium input pill with Web search, workspace files, text size (A), targeted search, voice recording, and submit arrow buttons.
 - **Utility Quick Actions:** Mounted copy response, text-to-speech, and history-reset triggers right above the message input bar.
 
+---
+
+## Entry 14 — Pinned Orchestrator with Crown & Sidebar Divider Polish
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 3.5 Flash | **Effort:** Medium
+
+### Summary
+Reorganized the sidebar tabs to add a dedicated AI Agent Orchestrator view directly beneath "Prep" styled with a custom crowned robot mascot and gold active indicators. Visually distinguished the active orchestrator agent (Sarah) across the main dashboard, workspace headers, and chat message headers with gold borders/shadows and crown icons. Upgraded the sidebar divider lines to be highly visible in both light and dark modes.
+
+### Technical Details
+- **Crowned Robot Mascot & Tab Placement:**
+  - Added a custom `CrownedBotIcon` SVG component rendering a golden crown above the robot.
+  - Inserted the Orchestrator Tab directly below `Prep` (as Tab 4, index 4), shifting the main AI Agent Dashboard to Tab 5 (index 5) and the global Settings view to Tab 6 (index 6).
+  - Designed gold tab active states (`text-amber-500` / active indicator bar `bg-amber-500`) for the Orchestrator tab in the left sidebar.
+- **Orchestrator Visual Highlights:**
+  - Applied gold borders (`border-[#f59e0b]` / `border-amber-400`) and subtle gold drop-shadows to the active orchestrator agent's grid card on the AI Agent Dashboard.
+  - Displayed a gold crown (`👑`) next to the orchestrator's name in the dashboard grid card, workspace header, and chat message bubble headers.
+  - Custom-tailored the Orchestrator Terminal view with primary coordinator badges and a gold border matching the active agent's brand colors.
+- **High-Visibility Dividers:**
+  - Upgraded the three vertical sidebar dividers in the layout to use a darker, higher-contrast shade (`bg-zinc-300 dark:bg-zinc-700/85`) to guarantee clear readability in both light and dark themes.
+
 
