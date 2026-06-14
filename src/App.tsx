@@ -358,24 +358,53 @@ export default function App() {
   // Ingestions states for Developer Ingestions Router
   interface IngestionConnection {
     id: string;
-    category: "Market Data" | "Exchanges" | "Banks" | "Databases";
+    category: string;
     provider: string;
     name: string;
     apiKey: string;
     status: "Active" | "Connected" | "Routing" | "Idle";
+    pullInterval?: string;
   }
 
   const [ingestionConnections, setIngestionConnections] = useState<IngestionConnection[]>([
-    { id: "cg-1", category: "Market Data", provider: "CoinGecko", name: "CoinGecko Free API", apiKey: "cg-********************", status: "Active" },
-    { id: "kc-1", category: "Exchanges", provider: "KuCoin", name: "KuCoin Live Trading", apiKey: "kc-********************", status: "Active" },
-    { id: "db-1", category: "Databases", provider: "MongoDB", name: "Primary Portfolio DB", apiKey: "mongodb+srv://...", status: "Connected" },
-    { id: "bk-1", category: "Banks", provider: "Plaid", name: "Plaid Bank Sync", apiKey: "plaid_sb_****************", status: "Routing" }
+    { id: "cg-1", category: "Market Data", provider: "CoinGecko", name: "CoinGecko Free API", apiKey: "cg-********************", status: "Active", pullInterval: "1m" },
+    { id: "kc-1", category: "Exchanges", provider: "KuCoin", name: "KuCoin Live Trading", apiKey: "kc-********************", status: "Active", pullInterval: "5m" },
+    { id: "db-1", category: "Databases", provider: "MongoDB", name: "Primary Portfolio DB", apiKey: "mongodb+srv://...", status: "Connected", pullInterval: "15m" },
+    { id: "bk-1", category: "Banks", provider: "Plaid", name: "Plaid Bank Sync", apiKey: "plaid_sb_****************", status: "Routing", pullInterval: "1m" }
   ]);
 
-  const [newConnCategory, setNewConnCategory] = useState<"Market Data" | "Exchanges" | "Banks" | "Databases">("Market Data");
+  const [ingestionCategories, setIngestionCategories] = useState<string[]>([
+    "Market Data",
+    "Exchanges",
+    "Banks",
+    "Databases"
+  ]);
+  const [newConnCategory, setNewConnCategory] = useState<string>("Market Data");
   const [newConnProvider, setNewConnProvider] = useState("CoinGecko");
   const [newConnName, setNewConnName] = useState("");
   const [newConnKey, setNewConnKey] = useState("");
+  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
+  const [newConnInterval, setNewConnInterval] = useState("5m");
+
+  const [ingestionRouterName, setIngestionRouterName] = useState("INGESTION ROUTER");
+  const [localPortfolioName, setLocalPortfolioName] = useState("Local Portfolio");
+  const [isEditingRouterName, setIsEditingRouterName] = useState(false);
+  const [isEditingPortfolioName, setIsEditingPortfolioName] = useState(false);
+
+  const [mapHeight, setMapHeight] = useState(220);
+  const isDraggingMapHeight = useRef(false);
+  const dragStartMapY = useRef(0);
+  const dragStartMapHeight = useRef(0);
+
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const [svgPaths, setSvgPaths] = useState<{
+    connections: { d: string; dotStyle: React.CSSProperties }[];
+    routerToPortfolio: { d: string; dotStyle: React.CSSProperties } | null;
+  }>({ connections: [], routerToPortfolio: null });
+
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Password changer inputs & status
   const [currentPasswordInput, setCurrentPasswordInput] = useState("");
@@ -600,11 +629,17 @@ export default function App() {
         modalOffsetRef.current = newPos;
         setModalOffset(newPos);
       }
+      if (isDraggingMapHeight.current) {
+        const delta = e.clientY - dragStartMapY.current;
+        const newH = Math.min(450, Math.max(160, dragStartMapHeight.current + delta));
+        setMapHeight(newH);
+      }
     };
     const onUp = () => {
       isDraggingLedger.current = false;
       isDraggingLeftPanel.current = false;
       isDraggingRightPanel.current = false;
+      isDraggingMapHeight.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       setIsDraggingLeft(false);
@@ -621,6 +656,87 @@ export default function App() {
       window.removeEventListener("mouseup", onUp);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showPreferencesModal || preferencesActiveSection !== "developer") return;
+    
+    const calculatePositions = () => {
+      const parent = mapWrapperRef.current;
+      if (!parent) return;
+
+      const parentRect = parent.getBoundingClientRect();
+      const routerEl = parent.querySelector(".ingestion-router-box");
+      const portfolioEl = parent.querySelector(".local-portfolio-box");
+      const categoryEls = parent.querySelectorAll(".category-box-node");
+
+      if (!routerEl || !portfolioEl || categoryEls.length === 0) return;
+
+      const routerRect = routerEl.getBoundingClientRect();
+      const portfolioRect = portfolioEl.getBoundingClientRect();
+
+      // Ingestion Router left edge center relative to parent
+      const routerLeftX = routerRect.left - parentRect.left;
+      const routerLeftY = (routerRect.top + routerRect.bottom) / 2 - parentRect.top;
+
+      // Ingestion Router right edge center relative to parent
+      const routerRightX = routerRect.right - parentRect.left;
+      const routerRightY = (routerRect.top + routerRect.bottom) / 2 - parentRect.top;
+
+      // Local Portfolio left edge center relative to parent
+      const portfolioLeftX = portfolioRect.left - parentRect.left;
+      const portfolioLeftY = (portfolioRect.top + portfolioRect.bottom) / 2 - parentRect.top;
+
+      const newConnections: { d: string; dotStyle: React.CSSProperties }[] = [];
+
+      categoryEls.forEach((el, index) => {
+        const rect = el.getBoundingClientRect();
+        // Category right edge center relative to parent
+        const fromX = rect.right - parentRect.left;
+        const fromY = (rect.top + rect.bottom) / 2 - parentRect.top;
+
+        const ctrlX = (fromX + routerLeftX) / 2;
+        const pathD = `M ${fromX} ${fromY} C ${ctrlX} ${fromY}, ${ctrlX} ${routerLeftY}, ${routerLeftX} ${routerLeftY}`;
+
+        newConnections.push({
+          d: pathD,
+          dotStyle: {
+            animationDelay: `${index * 0.4}s`
+          }
+        });
+      });
+
+      const routerToPortD = `M ${routerRightX} ${routerRightY} L ${portfolioLeftX} ${portfolioLeftY}`;
+
+      setSvgPaths({
+        connections: newConnections,
+        routerToPortfolio: {
+          d: routerToPortD,
+          dotStyle: { animationDelay: "0.2s" }
+        }
+      });
+    };
+
+    calculatePositions();
+    window.addEventListener("resize", calculatePositions);
+    
+    const observer = new ResizeObserver(calculatePositions);
+    if (mapWrapperRef.current) {
+      observer.observe(mapWrapperRef.current);
+    }
+
+    return () => {
+      window.removeEventListener("resize", calculatePositions);
+      observer.disconnect();
+    };
+  }, [showPreferencesModal, preferencesActiveSection, mapHeight, ingestionConnections, ingestionCategories]);
+
+  const handleMapDragStart = (e: React.MouseEvent) => {
+    isDraggingMapHeight.current = true;
+    dragStartMapY.current = e.clientY;
+    dragStartMapHeight.current = mapHeight;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  };
 
   const handleLeftDragStart = (e: React.MouseEvent) => {
     isDraggingLeftPanel.current = true;
@@ -1801,21 +1917,8 @@ export default function App() {
         return (
           <div className="space-y-6 font-sans pb-6">
             <style>{`
-              @keyframes flow-dots {
-                0% { left: 0%; opacity: 0; }
-                10% { opacity: 1; }
-                90% { opacity: 1; }
-                100% { left: 100%; opacity: 0; }
-              }
-              .flow-dot-anim {
-                position: absolute;
-                top: -3px;
-                width: 6px;
-                height: 6px;
-                border-radius: 50%;
-                background-color: #10b981;
-                box-shadow: 0 0 6px #10b981;
-                animation: flow-dots 2.5s linear infinite;
+              .flow-dot-pulse {
+                filter: drop-shadow(0 0 3px #10b981);
               }
             `}</style>
             
@@ -1830,18 +1933,37 @@ export default function App() {
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ingestion API Router & Coordinator</h3>
               
               {/* Animated Connection Map */}
-              <div className="p-4 rounded-xl border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-955/30 flex flex-col gap-4 overflow-hidden relative">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1">Real-time Routing Coordinator Map</div>
-                <div className="flex justify-between items-center relative py-6 px-4">
+              <div 
+                ref={mapWrapperRef}
+                style={{ height: `${mapHeight}px` }}
+                className="p-4 rounded-xl border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-955/30 flex flex-col gap-2 overflow-hidden relative transition-all duration-75"
+              >
+                <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1 flex-shrink-0">Real-time Routing Coordinator Map</div>
+                <div className="flex-1 flex justify-between items-center relative py-2 px-4 select-none">
                   {/* Category Circles (Left side) */}
                   <div className="flex flex-col gap-3 z-10 w-28">
-                    {["Market Data", "Exchanges", "Banks", "Databases"].map((cat) => {
+                    {ingestionCategories.map((cat) => {
                       const count = ingestionConnections.filter(c => c.category === cat).length;
                       return (
-                        <div key={cat} className="flex items-center gap-2 p-1 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 shadow-2xs">
+                        <div 
+                          key={cat} 
+                          className="category-box-node flex items-center gap-2 p-1 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 shadow-2xs cursor-pointer transition-all hover:border-emerald-500/50"
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const parentRect = mapWrapperRef.current?.getBoundingClientRect();
+                            if (parentRect) {
+                              setTooltipPosition({
+                                x: rect.right - parentRect.left + 10,
+                                y: rect.top - parentRect.top - 10
+                              });
+                            }
+                            setHoveredCategory(cat);
+                          }}
+                          onMouseLeave={() => setHoveredCategory(null)}
+                        >
                           <div className={`w-2 h-2 fill-current rounded-full ${count > 0 ? "bg-emerald-500 animate-pulse" : "bg-gray-300 dark:bg-zinc-700"}`} />
                           <div className="flex flex-col min-w-0">
-                            <span className="text-[9px] font-bold truncate leading-none">{cat}</span>
+                            <span className="text-[9px] font-bold truncate leading-none text-gray-800 dark:text-zinc-200">{cat}</span>
                             <span className="text-[7px] text-gray-450 leading-none mt-1">{count} Active</span>
                           </div>
                         </div>
@@ -1850,131 +1972,232 @@ export default function App() {
                   </div>
                   
                   {/* Router Box (Center) */}
-                  <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 z-10 w-36 shadow-lg">
-                    <Sparkles className="w-5 h-5 text-emerald-500 animate-spin" style={{ animationDuration: "12s" }} />
-                    <span className="text-[10px] font-extrabold mt-1 text-emerald-600 dark:text-emerald-400 tracking-wider">INGESTION ROUTER</span>
+                  <div className="ingestion-router-box flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 z-10 w-36 shadow-lg">
+                    <Sparkles className="w-5 h-5 text-emerald-500 animate-spin mb-1" style={{ animationDuration: "12s" }} />
+                    {isEditingRouterName ? (
+                      <input 
+                        type="text"
+                        value={ingestionRouterName}
+                        onChange={(e) => setIngestionRouterName(e.target.value)}
+                        onBlur={() => setIsEditingRouterName(false)}
+                        onKeyDown={(e) => { if (e.key === "Enter") setIsEditingRouterName(false); }}
+                        className="text-[10px] font-extrabold text-center bg-transparent border-b border-emerald-500 focus:outline-none w-28 uppercase text-gray-900 dark:text-white"
+                        autoFocus
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => setIsEditingRouterName(true)}
+                        className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 tracking-wider cursor-pointer hover:underline flex items-center gap-1 select-none"
+                        title="Click to rename"
+                      >
+                        {ingestionRouterName}
+                      </span>
+                    )}
                     <span className="text-[8px] text-gray-400 mt-0.5">Coordinator Engine</span>
                   </div>
 
                   {/* Portfolio Engine (Right side) */}
-                  <div className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 z-10 w-28 shadow-sm">
-                    <FolderHeart className="w-4 h-4 text-rose-500 animate-pulse" />
-                    <span className="text-[9px] font-bold mt-1">Local Portfolio</span>
+                  <div className="local-portfolio-box flex flex-col items-center justify-center p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 z-10 w-28 shadow-sm">
+                    <FolderHeart className="w-4 h-4 text-rose-500 animate-pulse mb-1" />
+                    {isEditingPortfolioName ? (
+                      <input 
+                        type="text"
+                        value={localPortfolioName}
+                        onChange={(e) => setLocalPortfolioName(e.target.value)}
+                        onBlur={() => setIsEditingPortfolioName(false)}
+                        onKeyDown={(e) => { if (e.key === "Enter") setIsEditingPortfolioName(false); }}
+                        className="text-[9px] font-bold text-center bg-transparent border-b border-gray-500 focus:outline-none w-20 text-gray-900 dark:text-white"
+                        autoFocus
+                      />
+                    ) : (
+                      <span 
+                        onClick={() => setIsEditingPortfolioName(true)}
+                        className="text-[9px] font-bold cursor-pointer hover:underline select-none"
+                        title="Click to rename"
+                      >
+                        {localPortfolioName}
+                      </span>
+                    )}
                     <span className="text-[7px] text-gray-400">Core Engine</span>
                   </div>
 
                   {/* SVG Flow Lines Behind (absolute position) */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                    <svg className="w-full h-full opacity-30 dark:opacity-20" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M 112 42 L 180 85" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                      <path d="M 112 70 L 180 85" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                      <path d="M 112 98 L 180 85" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                      <path d="M 112 126 L 180 85" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                      <path d="M 312 85 L 400 85" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
+                  <div className="absolute inset-0 pointer-events-none z-0">
+                    <svg className="w-full h-full opacity-35 dark:opacity-25" xmlns="http://www.w3.org/2000/svg">
+                      {svgPaths.connections.map((conn, idx) => (
+                        <g key={idx}>
+                          <path d={conn.d} stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
+                          <circle r="3.5" fill="#10b981" className="flow-dot-pulse">
+                            <animateMotion 
+                              path={conn.d} 
+                              dur="2.5s" 
+                              repeatCount="indefinite" 
+                              begin={conn.dotStyle.animationDelay as string} 
+                            />
+                          </circle>
+                        </g>
+                      ))}
+                      {svgPaths.routerToPortfolio && (
+                        <g>
+                          <path d={svgPaths.routerToPortfolio.d} stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
+                          <circle r="3.5" fill="#10b981" className="flow-dot-pulse">
+                            <animateMotion 
+                              path={svgPaths.routerToPortfolio.d} 
+                              dur="2.5s" 
+                              repeatCount="indefinite" 
+                              begin="0.2s" 
+                            />
+                          </circle>
+                        </g>
+                      )}
                     </svg>
-                    {/* Animated dots along paths */}
-                    <div className="absolute left-[130px] top-[50px] w-24 h-1 overflow-visible">
-                      <div className="flow-dot-anim" style={{ animationDelay: "0s" }} />
-                    </div>
-                    <div className="absolute left-[130px] top-[75px] w-24 h-1 overflow-visible">
-                      <div className="flow-dot-anim" style={{ animationDelay: "0.5s" }} />
-                    </div>
-                    <div className="absolute left-[130px] top-[95px] w-24 h-1 overflow-visible">
-                      <div className="flow-dot-anim" style={{ animationDelay: "1.2s" }} />
-                    </div>
-                    <div className="absolute left-[130px] top-[120px] w-24 h-1 overflow-visible">
-                      <div className="flow-dot-anim" style={{ animationDelay: "1.8s" }} />
-                    </div>
-                    <div className="absolute left-[330px] top-[85px] w-20 h-1 overflow-visible">
-                      <div className="flow-dot-anim" style={{ animationDelay: "0.2s" }} />
-                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Connections Router Slots */}
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Configured Router Slots</div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {ingestionConnections.map((conn) => {
-                    const IconComponent = conn.category === "Market Data" 
-                      ? Globe 
-                      : conn.category === "Exchanges" 
-                        ? TrendingUp 
-                        : conn.category === "Banks" 
-                          ? Landmark 
-                          : Database;
-                    return (
-                      <div key={conn.id} className="flex justify-between items-center p-3 rounded-lg border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/80 dark:bg-[#121214]/50 hover:bg-white dark:hover:bg-zinc-900/60 transition-colors shadow-2xs">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-850 flex items-center justify-center flex-shrink-0 border border-gray-200/50 dark:border-zinc-800">
-                            <IconComponent className="w-4 h-4 text-emerald-500" />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold truncate">{conn.name}</span>
-                              <span className="text-[7.5px] font-extrabold px-1 py-0.5 rounded bg-gray-200 dark:bg-zinc-800 text-gray-450 dark:text-zinc-500 uppercase tracking-widest leading-none">{conn.provider}</span>
-                            </div>
-                            <span className="text-[9px] text-gray-400 font-mono truncate mt-0.5">{conn.apiKey}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border tracking-wide uppercase ${
-                            conn.status === "Active" || conn.status === "Connected"
-                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                              : conn.status === "Routing"
-                                ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 animate-pulse"
-                                : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                          }`}>
-                            {conn.status}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIngestionConnections(prev => prev.filter(c => c.id !== conn.id));
-                              playNaviAlert("listen");
-                            }}
-                            className="p-1 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-500/5 cursor-pointer transition-colors"
-                            title="Delete connection"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                {/* Hover Tooltip display */}
+                {hoveredCategory && (
+                  <div 
+                    style={{ 
+                      left: `${tooltipPosition.x}px`, 
+                      top: `${tooltipPosition.y}px` 
+                    }}
+                    className="absolute z-20 w-56 p-3 rounded-lg border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 shadow-lg backdrop-blur-xs text-xs pointer-events-none transition-all duration-200"
+                  >
+                    <div className="font-bold text-gray-900 dark:text-white mb-1.5 border-b border-gray-100 dark:border-zinc-850 pb-1 flex justify-between items-center">
+                      <span>{hoveredCategory}</span>
+                      <span className="text-[8px] text-emerald-500 font-extrabold uppercase">API Streams</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {ingestionConnections.filter(c => c.category === hoveredCategory).length === 0 ? (
+                        <span className="text-gray-455 italic text-[10px]">No active connections</span>
+                      ) : (
+                        ingestionConnections
+                          .filter(c => c.category === hoveredCategory)
+                          .map(conn => {
+                            const interval = conn.pullInterval || "5m";
+                            const mockPullTimes = {
+                              "cg-1": "14s ago",
+                              "kc-1": "2m ago",
+                              "db-1": "7m ago",
+                              "bk-1": "45s ago"
+                            } as any;
+                            const lastPulled = mockPullTimes[conn.id] || "Just now";
+                            return (
+                              <div key={conn.id} className="flex flex-col text-[10px] bg-gray-50/50 dark:bg-zinc-900/40 p-1.5 rounded border border-gray-150/45 dark:border-zinc-800/50">
+                                <div className="flex justify-between items-center font-semibold">
+                                  <span className="truncate max-w-[110px] text-gray-800 dark:text-zinc-200">{conn.name}</span>
+                                  <span className="text-[7.5px] px-1 py-0.5 rounded bg-gray-250 dark:bg-zinc-800 text-gray-500 font-mono leading-none">{interval}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[8.5px] text-gray-450 mt-1">
+                                  <span>Status: <strong className="text-emerald-500">{conn.status}</strong></span>
+                                  <span>Pull: {lastPulled}</span>
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resizable drag bar at the bottom */}
+                <div 
+                  onMouseDown={handleMapDragStart}
+                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-emerald-500/20 active:bg-emerald-500/40 flex items-center justify-center transition-colors group"
+                >
+                  <div className="w-8 h-1 rounded-full bg-gray-300 dark:bg-zinc-700 group-hover:bg-emerald-500/60 transition-colors" />
                 </div>
               </div>
+            </div>
 
-              {/* Add Ingestion Slot Form */}
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                if (!newConnName.trim() || !newConnKey.trim()) return;
-                const newId = `conn-${Date.now()}`;
-                const newConn: IngestionConnection = {
-                  id: newId,
-                  category: newConnCategory,
-                  provider: newConnProvider,
-                  name: newConnName,
-                  apiKey: newConnKey.length > 20 ? `${newConnKey.slice(0, 10)}...${newConnKey.slice(-6)}` : newConnKey,
-                  status: newConnCategory === "Banks" ? "Routing" : "Connected"
-                };
-                setIngestionConnections(prev => [...prev, newConn]);
-                setNewConnName("");
-                setNewConnKey("");
-                playNaviAlert("hello");
-                alert(`Successfully registered ${newConnName} API connection!`);
-              }} className="p-4 rounded-xl border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/50 dark:bg-zinc-950/20 space-y-3 max-w-xl">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1">Add Router Connection</div>
-                
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase">Category</label>
-                    <select 
-                      value={newConnCategory}
-                      onChange={(e) => {
-                        const cat = e.target.value as any;
+            {/* Connections Router Slots */}
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Configured Router Slots</div>
+              <div className="grid grid-cols-2 gap-2.5">
+                {ingestionConnections.map((conn) => {
+                  const IconComponent = conn.category === "Market Data" 
+                    ? Globe 
+                    : conn.category === "Exchanges" 
+                      ? TrendingUp 
+                      : conn.category === "Banks" 
+                        ? Landmark 
+                        : Database;
+                  return (
+                    <div key={conn.id} className="flex justify-between items-center p-3 rounded-lg border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/80 dark:bg-[#121214]/50 hover:bg-white dark:hover:bg-zinc-900/60 transition-colors shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-zinc-850 flex items-center justify-center flex-shrink-0 border border-gray-200/50 dark:border-zinc-800">
+                          <IconComponent className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold truncate">{conn.name}</span>
+                            <span className="text-[7.5px] font-extrabold px-1 py-0.5 rounded bg-gray-200 dark:bg-zinc-800 text-gray-450 dark:text-zinc-500 uppercase tracking-widest leading-none">{conn.provider}</span>
+                          </div>
+                          <span className="text-[9px] text-gray-400 font-mono truncate mt-0.5">{conn.apiKey}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border tracking-wide uppercase ${
+                          conn.status === "Active" || conn.status === "Connected"
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : conn.status === "Routing"
+                              ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 animate-pulse"
+                              : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                        }`}>
+                          {conn.status}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIngestionConnections(prev => prev.filter(c => c.id !== conn.id));
+                            playNaviAlert("listen");
+                          }}
+                          className="p-1 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-500/5 cursor-pointer transition-colors"
+                          title="Delete connection"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Add Ingestion Slot Form */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!newConnName.trim() || !newConnKey.trim()) return;
+              const newId = `conn-${Date.now()}`;
+              const newConn: IngestionConnection = {
+                id: newId,
+                category: newConnCategory,
+                provider: newConnProvider,
+                name: newConnName,
+                apiKey: newConnKey.length > 20 ? `${newConnKey.slice(0, 10)}...${newConnKey.slice(-6)}` : newConnKey,
+                status: newConnCategory === "Banks" ? "Routing" : "Connected",
+                pullInterval: newConnInterval
+              };
+              setIngestionConnections(prev => [...prev, newConn]);
+              setNewConnName("");
+              setNewConnKey("");
+              playNaviAlert("hello");
+              alert(`Successfully registered ${newConnName} API connection!`);
+            }} className="p-4 rounded-xl border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/50 dark:bg-zinc-950/20 space-y-3 max-w-xl">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1">Add Router Connection</div>
+              
+              <div className="grid grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Category</label>
+                  <select 
+                    value={newConnCategory}
+                    onChange={(e) => {
+                      const cat = e.target.value;
+                      if (cat === "ADD_CUSTOM_CATEGORY") {
+                        setShowCustomCategoryInput(true);
+                      } else {
                         setNewConnCategory(cat);
+                        setShowCustomCategoryInput(false);
                         setNewConnProvider(
                           cat === "Market Data" 
                             ? "CoinGecko" 
@@ -1984,102 +2207,141 @@ export default function App() {
                                 ? "Plaid" 
                                 : "MongoDB"
                         );
-                      }}
-                      className={`w-full px-2 py-1 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
-                    >
-                      <option value="Market Data">Market Data</option>
-                      <option value="Exchanges">Exchanges</option>
-                      <option value="Banks">Banks</option>
-                      <option value="Databases">Databases</option>
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase">Provider</label>
-                    <select 
-                      value={newConnProvider}
-                      onChange={(e) => setNewConnProvider(e.target.value)}
-                      className={`w-full px-2 py-1 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
-                    >
-                      {newConnCategory === "Market Data" && (
-                        <>
-                          <option value="CoinGecko">CoinGecko</option>
-                          <option value="CoinMarketCap">CoinMarketCap</option>
-                          <option value="Glassnode">Glassnode</option>
-                        </>
-                      )}
-                      {newConnCategory === "Exchanges" && (
-                        <>
-                          <option value="KuCoin">KuCoin</option>
-                          <option value="Binance">Binance</option>
-                          <option value="Coinbase">Coinbase</option>
-                        </>
-                      )}
-                      {newConnCategory === "Banks" && (
-                        <>
-                          <option value="Plaid">Plaid</option>
-                          <option value="Chase API">Chase API</option>
-                          <option value="Revolut">Revolut</option>
-                        </>
-                      )}
-                      {newConnCategory === "Databases" && (
-                        <>
-                          <option value="MongoDB">MongoDB</option>
-                          <option value="PostgreSQL">PostgreSQL</option>
-                          <option value="Excel Sheet">Excel Sheet</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-gray-400 uppercase">Connection Name</label>
-                    <input 
-                      type="text" 
-                      value={newConnName}
-                      onChange={(e) => setNewConnName(e.target.value)}
-                      placeholder="e.g. My KuCoin Key"
-                      className={`w-full px-2.5 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${tc.inputBg} ${tc.border}`}
-                      required
-                    />
-                  </div>
+                      }
+                    }}
+                    className={`w-full px-2 py-1 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
+                  >
+                    {ingestionCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="ADD_CUSTOM_CATEGORY">+ Add Custom Category...</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Provider</label>
+                  <input 
+                    type="text" 
+                    value={newConnProvider}
+                    onChange={(e) => setNewConnProvider(e.target.value)}
+                    placeholder={
+                      newConnCategory === "Market Data" 
+                        ? "e.g. CoinGecko" 
+                        : newConnCategory === "Exchanges" 
+                          ? "e.g. KuCoin" 
+                          : newConnCategory === "Banks" 
+                            ? "e.g. Plaid" 
+                            : "e.g. MongoDB"
+                    }
+                    className={`w-full px-2 py-1 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
+                    required
+                  />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-gray-400 uppercase">API Key / Connection String</label>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Connection Name</label>
                   <input 
-                    type="password" 
-                    value={newConnKey}
-                    onChange={(e) => setNewConnKey(e.target.value)}
-                    placeholder="Enter API Key, Client Secret, or MongoDB Connection String"
+                    type="text" 
+                    value={newConnName}
+                    onChange={(e) => setNewConnName(e.target.value)}
+                    placeholder="e.g. My KuCoin Key"
                     className={`w-full px-2.5 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${tc.inputBg} ${tc.border}`}
                     required
                   />
                 </div>
 
-                <button 
-                  type="submit"
-                  className="py-1 px-4 rounded bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs cursor-pointer transition-colors"
-                >
-                  Register Ingestion Connection
-                </button>
-              </form>
-
-              {/* Static Developer Tools Info */}
-              <div className="pt-4 border-t border-gray-250 dark:border-zinc-800 space-y-3">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Other SDK & Simulated Tools</div>
-                <div className="grid grid-cols-2 gap-3.5">
-                  {[
-                    { title: "AI Skill & CLI Core", desc: "Investment analysis agent for real-time quotes, portfolio data, news sentiment, and 50+ CLI commands." },
-                    { title: "Paper Trading Module", desc: "Simulated orders matched with live bid-ask spreads at zero cost, no real brokerage accounts needed." },
-                    { title: "Self-Documenting SDKs", desc: "Production SDK templates for Claude, Cursor, and Zed editor MCP integrations with built-in rate limiters." }
-                  ].map((item, idx) => (
-                    <div key={idx} className="space-y-0.5">
-                      <span className="text-xs font-bold text-gray-905 dark:text-zinc-100">{item.title}</span>
-                      <p className="text-[10px] text-gray-500 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
-                    </div>
-                  ))}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase">Sync Interval</label>
+                  <select
+                    value={newConnInterval}
+                    onChange={(e) => setNewConnInterval(e.target.value)}
+                    className={`w-full px-2 py-1 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
+                  >
+                    <option value="1m">1 minute</option>
+                    <option value="5m">5 minutes</option>
+                    <option value="15m">15 minutes</option>
+                    <option value="1h">1 hour</option>
+                    <option value="Manual">Manual Pull</option>
+                  </select>
                 </div>
+              </div>
+
+              {showCustomCategoryInput && (
+                <div className="flex gap-2 items-end mt-2 bg-gray-100/50 dark:bg-zinc-900/30 p-2 rounded border border-dashed border-gray-250 dark:border-zinc-800">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[8px] font-bold text-gray-400 uppercase">New Category Name</label>
+                    <input 
+                      type="text"
+                      value={customCategoryName}
+                      onChange={(e) => setCustomCategoryName(e.target.value)}
+                      placeholder="e.g. Social Metrics"
+                      className={`w-full px-2 py-0.5 text-xs rounded border focus:outline-none ${tc.inputBg} ${tc.border}`}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = customCategoryName.trim();
+                      if (name) {
+                        if (!ingestionCategories.includes(name)) {
+                          setIngestionCategories(prev => [...prev, name]);
+                        }
+                        setNewConnCategory(name);
+                        setCustomCategoryName("");
+                        setShowCustomCategoryInput(false);
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[10px] font-bold cursor-pointer hover:bg-emerald-600"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomCategoryInput(false);
+                      setNewConnCategory(ingestionCategories[0] || "Market Data");
+                    }}
+                    className="px-2 py-0.5 bg-gray-300 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 rounded text-[10px] font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-400 uppercase">API Key / Connection String</label>
+                <input 
+                  type="password" 
+                  value={newConnKey}
+                  onChange={(e) => setNewConnKey(e.target.value)}
+                  placeholder="Enter API Key, Client Secret, or MongoDB Connection String"
+                  className={`w-full px-2.5 py-1 text-xs rounded border focus:outline-none focus:ring-1 focus:ring-emerald-500 ${tc.inputBg} ${tc.border}`}
+                  required
+                />
+              </div>
+
+              <button 
+                type="submit"
+                className="py-1 px-4 rounded bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs cursor-pointer transition-colors"
+              >
+                Register Ingestion Connection
+              </button>
+            </form>
+
+            {/* Static Developer Tools Info */}
+            <div className="pt-4 border-t border-gray-250 dark:border-zinc-800 space-y-3">
+              <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">Other SDK & Simulated Tools</div>
+              <div className="grid grid-cols-2 gap-3.5">
+                {[
+                  { title: "AI Skill & CLI Core", desc: "Investment analysis agent for real-time quotes, portfolio data, news sentiment, and 50+ CLI commands." },
+                  { title: "Paper Trading Module", desc: "Simulated orders matched with live bid-ask spreads at zero cost, no real brokerage accounts needed." },
+                  { title: "Self-Documenting SDKs", desc: "Production SDK templates for Claude, Cursor, and Zed editor MCP integrations with built-in rate limiters." }
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-0.5">
+                    <span className="text-xs font-bold text-gray-905 dark:text-zinc-100">{item.title}</span>
+                    <p className="text-[10px] text-gray-500 dark:text-zinc-400 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
