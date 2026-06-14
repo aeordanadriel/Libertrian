@@ -59,6 +59,70 @@ function OrangeMascot({ className = "w-9 h-9" }: { className?: string }) {
   );
 }
 
+function OrchestratorMascot({ className = "w-9 h-9" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      {/* Outer Circle background - dark emerald/zinc cyber fill */}
+      <circle cx="50" cy="50" r="50" fill="#022c22" />
+      {/* Glowing border */}
+      <circle cx="50" cy="50" r="47" stroke="#10b981" strokeWidth="4" />
+      {/* Neon/White ears/horns on top */}
+      <path d="M26 25 C20 12, 38 12, 38 25 Z" fill="#10b981" />
+      <path d="M74 25 C80 12, 62 12, 62 25 Z" fill="#10b981" />
+      {/* Cyber mask face */}
+      <path d="M18 52 C18 35, 82 35, 82 52 C82 70, 70 82, 50 82 C30 82, 18 70, 18 52 Z" fill="#064e3b" />
+      {/* Eyes background (glowing green/white) */}
+      <circle cx="36" cy="48" r="10" fill="#10b981" />
+      <circle cx="64" cy="48" r="10" fill="#10b981" />
+      {/* Pupils (white glowing spark) */}
+      <circle cx="36" cy="48" r="3.5" fill="#FFF" />
+      <circle cx="64" cy="48" r="3.5" fill="#FFF" />
+      {/* Sleek cyber mouth/lines */}
+      <path d="M42 62 h16" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AgentMascot({ name, className = "w-8 h-8" }: { name: string; className?: string }) {
+  // Generate a deterministic background and primary color based on the agent's name
+  let colorBg = "#1e3a8a"; // default dark blue
+  let colorFace = "#172554";
+  let colorDetail = "#3b82f6"; // blue
+  
+  if (name.toLowerCase().includes("sarah")) {
+    colorBg = "#500724"; // pink
+    colorFace = "#831843";
+    colorDetail = "#ec4899";
+  } else if (name.toLowerCase().includes("bilbo")) {
+    colorBg = "#451a03"; // amber/gold
+    colorFace = "#78350f";
+    colorDetail = "#eab308";
+  } else if (name.toLowerCase().includes("gemini")) {
+    colorBg = "#311042"; // purple/indigo
+    colorFace = "#4c1d95";
+    colorDetail = "#8b5cf6";
+  } else if (name.toLowerCase().includes("kate")) {
+    colorBg = "#115e59"; // teal
+    colorFace = "#134e4a";
+    colorDetail = "#14b8a6";
+  }
+  
+  return (
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <circle cx="50" cy="50" r="50" fill={colorBg} />
+      <circle cx="50" cy="50" r="47" stroke={colorDetail} strokeWidth="3.5" />
+      <path d="M26 25 C20 12, 38 12, 38 25 Z" fill={colorDetail} />
+      <path d="M74 25 C80 12, 62 12, 62 25 Z" fill={colorDetail} />
+      <path d="M18 52 C18 35, 82 35, 82 52 C82 70, 70 82, 50 82 C30 82, 18 70, 18 52 Z" fill={colorFace} />
+      <circle cx="36" cy="48" r="10" fill={colorDetail} />
+      <circle cx="64" cy="48" r="10" fill={colorDetail} />
+      <circle cx="36" cy="48" r="3.5" fill="#FFF" />
+      <circle cx="64" cy="48" r="3.5" fill="#FFF" />
+      <path d="M42 62 C45 65, 55 65, 58 62" stroke="#FFF" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Types for transaction logging
 interface Order {
   action: "Buy" | "Sell";
@@ -2883,117 +2947,117 @@ export default function App() {
         
         {/* Left Sidebar Navigation */}
         <aside className={`flex flex-col border-r pt-4 pb-5 justify-between select-none transition-all duration-200 ${sidebarWidthClass} ${tc.card} ${tc.border}`}>
-          <div className="flex flex-col items-center gap-6 w-full">
-            {/* Logo */}
+          {/* Logo (Fixed) */}
+          <div className="w-full flex justify-center mb-6 flex-shrink-0">
             <div className="w-8 h-8 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-emerald-500" />
             </div>
-            
-            {/* Nav Tabs */}
-            <nav className="flex flex-col gap-2 w-full">
-              {[
-                { icon: Building2, label: "Banking" },
-                { icon: TrendingUp, label: "Market" },
-                { icon: FolderHeart, label: "Portfolio" },
-                { icon: Clock, label: "Prep" },
-                { icon: Bot, label: "Analyst" }
-              ].map((tab, idx) => {
-                const IconComponent = tab.icon;
-                const isActive = activeTab === idx && !activeAgentChatId;
-                return (
-                  <button
-                    key={tab.label}
-                    onClick={() => {
-                      setActiveAgentChatId(null);
-                      setActiveTab(idx);
-                    }}
-                    className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
-                      menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
-                    }`}
-                  >
-                    {isActive && (
-                      <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
-                    )}
-                    <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-emerald-500" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
-                    
-                    {menuBarIconStyle === "full" ? (
-                      <span className={`text-[11px] font-bold transition-colors ${isActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
-                        {tab.label}
-                      </span>
-                    ) : (
-                      /* Tooltip */
-                      <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
-                        {tab.label}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-
-              {/* Pinned Agents Section */}
-              {pinnedAgentIds.length > 0 && (
-                <>
-                  <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
-                  {pinnedAgentIds.map(agentId => {
-                    const agent = aiAgents.find(a => a.id === agentId);
-                    if (!agent) return null;
-                    const isAgentActive = activeAgentChatId === agentId;
-                    return (
-                      <button
-                        key={agentId}
-                        onClick={() => {
-                          setActiveAgentChatId(agentId);
-                        }}
-                        className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
-                          menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
-                        }`}
-                        title={`${agent.name} Workspace`}
-                      >
-                        {isAgentActive && (
-                          <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
-                        )}
-                        <Bot className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "text-emerald-500 animate-pulse" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
-                        {menuBarIconStyle === "full" ? (
-                          <span className={`text-[11px] font-bold transition-colors ${isAgentActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
-                            {agent.name}
-                          </span>
-                        ) : (
-                          <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
-                            {agent.name}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-
-              {/* Settings Tab */}
-              <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
-              <button
-                onClick={() => {
-                  setActiveAgentChatId(null);
-                  setPreferencesActiveSection("general_basic");
-                  setShowPreferencesModal(true);
-                  setIsSettingsDockedToSidebar(false);
-                }}
-                className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
-                  menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
-                }`}
-              >
-                <Settings className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white" />
-                {menuBarIconStyle === "full" ? (
-                  <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
-                    Settings
-                  </span>
-                ) : (
-                  <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
-                    Settings
-                  </span>
-                )}
-              </button>
-            </nav>
           </div>
+          
+          {/* Nav Tabs & Pinned List (Scrollable) */}
+          <nav className="flex-1 w-full flex flex-col gap-2 overflow-y-auto scrollbar-none pr-1 mb-4">
+            {[
+              { icon: Building2, label: "Banking" },
+              { icon: TrendingUp, label: "Market" },
+              { icon: FolderHeart, label: "Portfolio" },
+              { icon: Clock, label: "Prep" },
+              { icon: Bot, label: "Agent" }
+            ].map((tab, idx) => {
+              const IconComponent = tab.icon;
+              const isActive = activeTab === idx && !activeAgentChatId;
+              return (
+                <button
+                  key={tab.label}
+                  onClick={() => {
+                    setActiveAgentChatId(null);
+                    setActiveTab(idx);
+                  }}
+                  className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
+                    menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
+                  }`}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
+                  )}
+                  <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-emerald-500" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                  
+                  {menuBarIconStyle === "full" ? (
+                    <span className={`text-[11px] font-bold transition-colors ${isActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
+                      {tab.label}
+                    </span>
+                  ) : (
+                    /* Tooltip */
+                    <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
+                      {tab.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Pinned Agents Section */}
+            {pinnedAgentIds.length > 0 && (
+              <>
+                <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+                {pinnedAgentIds.map(agentId => {
+                  const agent = aiAgents.find(a => a.id === agentId);
+                  if (!agent) return null;
+                  const isAgentActive = activeAgentChatId === agentId;
+                  return (
+                    <button
+                      key={agentId}
+                      onClick={() => {
+                        setActiveAgentChatId(agentId);
+                      }}
+                      className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
+                        menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
+                      }`}
+                      title={`${agent.name} Workspace`}
+                    >
+                      {isAgentActive && (
+                        <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
+                      )}
+                      <Bot className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "text-emerald-500 animate-pulse" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                      {menuBarIconStyle === "full" ? (
+                        <span className={`text-[11px] font-bold transition-colors ${isAgentActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
+                          {agent.name}
+                        </span>
+                      ) : (
+                        <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
+                          {agent.name}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Settings Tab */}
+            <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+            <button
+              onClick={() => {
+                setActiveAgentChatId(null);
+                setPreferencesActiveSection("general_basic");
+                setShowPreferencesModal(true);
+                setIsSettingsDockedToSidebar(false);
+              }}
+              className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
+                menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
+              }`}
+            >
+              <Settings className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white" />
+              {menuBarIconStyle === "full" ? (
+                <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
+                  Settings
+                </span>
+              ) : (
+                <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
+                  Settings
+                </span>
+              )}
+            </button>
+          </nav>
 
           {/* Bottom controls: dark mode toggle + profile */}
           <div className={`flex flex-col gap-3 w-full ${menuBarIconStyle === "full" ? "px-3 items-start" : "items-center"}`}>
@@ -4042,9 +4106,7 @@ export default function App() {
                       <div key={agent.id} className="min-w-[210px] max-w-[240px] p-3 rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-950/20 flex flex-col justify-between flex-shrink-0 transition-shadow hover:shadow-sm">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="p-1.5 rounded bg-emerald-500/10 text-emerald-500 flex-shrink-0">
-                              <Bot className="w-4 h-4" />
-                            </div>
+                            <AgentMascot name={agent.name} className="w-8 h-8 flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                               <span className="text-xs font-bold truncate">{agent.name}</span>
                               <span className="text-[9px] text-gray-400 font-semibold truncate">{agent.aiModel}</span>
@@ -4107,7 +4169,10 @@ export default function App() {
                 {/* Chat Console */}
                 <div className="flex-1 h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden">
                   <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
-                    <span>Orchestrator Terminal</span>
+                    <div className="flex items-center gap-2">
+                      <OrchestratorMascot className="w-5 h-5 flex-shrink-0" />
+                      <span>Orchestrator Terminal</span>
+                    </div>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">Main Hub</span>
                   </span>
                   
@@ -4117,10 +4182,18 @@ export default function App() {
                       const isUser = msg.sender === "User";
                       const isSystem = msg.sender === "System";
                       return (
-                        <div key={idx} className={`flex w-full ${isUser ? "justify-end" : "justify-start"}`}>
+                        <div key={idx} className={`flex w-full gap-2.5 ${isUser ? "justify-end" : "justify-start"}`}>
+                          {!isUser && !isSystem && (
+                            <OrchestratorMascot className="w-7 h-7 rounded-full flex-shrink-0 mt-0.5" />
+                          )}
+                          {isSystem && (
+                            <div className="w-7 h-7 flex items-center justify-center text-gray-400 dark:text-zinc-500 flex-shrink-0">
+                              <Info className="w-4 h-4" />
+                            </div>
+                          )}
                           <div className={`max-w-[80%] p-3 rounded-lg border text-xs leading-relaxed ${isUser ? "bg-emerald-500/10 border-emerald-500 text-black dark:text-[#f4f4f5]" : isSystem ? "bg-zinc-100 dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-gray-400" : "bg-white dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-black dark:text-[#f4f4f5]"}`}>
                             <div className="flex items-center gap-1.5 font-bold mb-1 border-b border-gray-100 dark:border-zinc-800 pb-0.5">
-                              <span className={isUser ? "text-emerald-500" : "text-gray-400"}>{msg.sender}</span>
+                              <span className={isUser ? "text-emerald-500" : "text-emerald-600 dark:text-emerald-400"}>{msg.sender}</span>
                             </div>
                             <p className="whitespace-pre-line font-medium">{msg.text}</p>
                           </div>
@@ -4152,7 +4225,7 @@ export default function App() {
 
                 {/* Generated Reports */}
                 <div className="w-[320px] h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col p-4 overflow-hidden">
-                  <span className="font-bold text-sm mb-4">Analyst Reports</span>
+                  <span className="font-bold text-sm mb-4">Agent Reports</span>
                   <div className="flex-1 overflow-y-auto space-y-3">
                     {[
                       { title: "SUI vs BTC SVB Recovery Delta", desc: "Analyzes the 2.16x SUI multiplier during the SVB banking panic.", date: "June 13, 2026" },

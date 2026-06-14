@@ -272,3 +272,22 @@ Redesigned the application layout to support a full-height left navigation sideb
 - **Real-Time SVG Flows & Extensions:**
   - Connected lines dynamically using custom coordinate bounding boxes. Muted gray lines are drawn when a category has 0 active connections; glowing green flow packet animations are activated only for active connections.
   - Status bar category filter has a narrower dropdown (`w-26`), darker border styling, and a `+ Add Category` button that dynamically appends to `sectorsList` state. Added TypeScript fallback indexing checks on `sectorData` to prevent runtime crashes.
+
+---
+
+## Entry 11 — Sidebar Scroll Navigation, Workspace Return Paths & Dynamic AI Mascot Avatars
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 3.5 Flash (Medium) | **Effort:** Medium
+
+### Summary
+Implemented scrollable left sidebar navigation to handle large numbers of pinned agents without overflowing bottom avatar and theme controls, renamed the Analyst tab to "Agent", added a direct "Back" button in the custom 1-on-1 agent workspace header, and designed dynamic visual mascot avatars for the Orchestrator Terminal (cyber-emerald) and sub-agents (pink for Sarah, gold for Bilbo, indigo for Gemini, teal for Kate).
+
+### Technical Details
+- **Left Sidebar Navigation scrolling:** Wrapped tabs and pinned agents lists inside `<nav className="flex-1 w-full flex flex-col gap-2 overflow-y-auto scrollbar-none ...">`. Maintained Logo at top and Settings active + Theme toggle + Profile Avatar at bottom as fixed `flex-shrink-0` siblings. Added custom webkit scrollbar hiding rule to `src/index.css` via `.scrollbar-none`.
+- **Analyst Tab Rename:** Updated navigation tabs array label from `"Analyst"` to `"Agent"`, and renamed the `"Analyst Reports"` header to `"Agent Reports"`.
+- **Back Button:** Integrated a `<ChevronLeft>` back navigation button in `renderPinnedAgentWorkspace` header that sets `activeAgentChatId(null)` to exit 1-on-1 chat console.
+- **Orchestrator Mascot Face:** Created `OrchestratorMascot` (cyber-emerald theme) and integrated it in the Orchestrator Terminal header and message history templates.
+- **Dynamic Sub-Agent Mascots:** Created a parameterized `<AgentMascot name={agent.name} />` resolving background, face, and detail fills deterministically (pink, gold, indigo, teal, or blue). Applied it to deployed agents list cards, custom workspace header, and chat history bubbles.
