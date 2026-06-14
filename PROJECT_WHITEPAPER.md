@@ -364,7 +364,7 @@ Reorganized the sidebar tabs to add a dedicated Orchestrator view directly benea
 
 ---
 
-## Entry 15 — Security Seals & Biometric Lock Screens for AI Agents
+## Entry 15 — Advanced Security Seals, Master Passcode, macOS Biometrics Sim, & Context Menus
 
 **Date:** 2026-06-14
 **Developer:** Antigravity (AI)
@@ -372,19 +372,24 @@ Reorganized the sidebar tabs to add a dedicated Orchestrator view directly benea
 **Model:** Gemini 3.5 Flash | **Effort:** High
 
 ### Summary
-Designed and implemented an interactive biometric security "Seal" overlay allowing users to lock their active Orchestrator (Sarah) or individual sub-agents behind fingerprint authentication screens. Configured two seal types (Fully Sealed vs. Orchestrator-Tethered Trust) and embedded lock controls on both the Dashboard cards and inside the AI Config modal.
+Upgraded the security seal subsystem to incorporate a Master Passcode configuration gate, a simulated macOS Touch ID system dialog, a numerical/password fallback input panel, right-click context menus for sidebar agent icons, and a global lock for the Deployed Agents Dashboard.
 
 ### Technical Details
-- **Biometric Lockscreen Overlay Component:**
-  - Built a `<BiometricLockOverlay>` component featuring a glassmorphic blurred backdrop (`backdrop-blur-xl`), user-verification text, and an interactive Hold-to-Scan fingerprint scanner button.
-  - Designed keyframe animations for active scanning lasers and circular progress ring path indicators that fill dynamically as the scanner is pressed.
-  - Supported cancel hooks (`onClose`) and success verification states.
-- **Unified Workspace Protection:**
-  - Protected the Orchestrator Terminal (`Tab 4`) and any sub-agent workspace view (`activeAgentChatId`) with the lockscreen overlay if the targeted agent is currently sealed.
-  - Integrated biometric authentication directly into the floating Companion Chat Panel, locking access to message history until credentials are held and verified.
-- **Card Controls & State Management:**
-  - Rendered glowing lock status indicators next to the agent's name in their dashboard cards.
-  - Added quick-toggle seal buttons directly on the cards, allowing immediate locks or launching the fingerprint scanner screen for session-unlock.
-  - Added new configuration sections in the Settings/Preferences Modal to manage the security seal states and customize the seal trust type.
+- **Master Passcode Setup Gate:**
+  - Built a Passcode Setup Modal that prompts the user to create and confirm a Master Passcode when enabling security locks/seals for the first time.
+  - Validates inputs and stores the master passcode securely in local storage.
+- **macOS Touch ID System Dialog Simulation:**
+  - Redesigned the `<BiometricLockOverlay>` component to resemble the native macOS Touch ID prompt, styled with frosted glassmorphism (`bg-[#ececec]/85` dark: `bg-[#282828]/85`) and circular SVG scan progress.
+  - Supports click-and-hold scanning directly on the Touch ID icon.
+- **Numerical / Password Fallback Screen:**
+  - Integrates a password input screen fallback inside the overlay when Touch ID isn't used.
+  - Implements shake animations on incorrect passcode submissions.
+- **Right-Click Context Menus & Sidebar Badging:**
+  - Attached custom context menus (on right-click/long-press) to sidebar agent icons, the Orchestrator tab, and the Agent Dashboard tab.
+  - Overlays pulsing absolute padlock badges in the corner of sealed/locked agent shortcuts and tab icons.
+- **Global Dashboard Seal:**
+  - Integrates a dashboard-wide security lock gating Tab 5 (AI Agent Dashboard) behind biometric and passcode checks.
+- **Security Preferences Center:**
+  - Created a dedicated "Security Seals" preference section in the Settings modal to reset passcode keys, toggle dashboard locks, and manage individual agent seal types.
 
 

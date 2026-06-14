@@ -106,7 +106,12 @@ function BiometricLockOverlay({
 }) {
   const [progress, setProgress] = useState(0);
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'success'>('idle');
+  const [viewMode, setViewMode] = useState<'biometrics' | 'passcode'>('biometrics');
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState(false);
   const timerRef = useRef<any>(null);
+
+  const storedPasscode = localStorage.getItem("libertrian_master_passcode");
 
   const startScanning = () => {
     if (scanState === 'success') return;
@@ -158,141 +163,157 @@ function BiometricLockOverlay({
     };
   }, []);
 
-  const strokeDashoffset = 251.2 - (251.2 * progress) / 100;
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcodeInput === storedPasscode) {
+      setScanState('success');
+      setTimeout(() => {
+        onUnlock();
+      }, 300);
+    } else {
+      setPasscodeError(true);
+      setTimeout(() => setPasscodeError(false), 800);
+    }
+  };
+
+  const strokeDashoffset = 163.2 - (163.2 * progress) / 100;
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-xl bg-[#fafafa]/80 dark:bg-zinc-950/80 font-sans p-6 text-center select-none animate-fade-in">
-      <div className="max-w-md w-full p-8 rounded-3xl bg-white/70 dark:bg-zinc-900/70 border border-gray-200 dark:border-zinc-800/80 shadow-2xl flex flex-col items-center relative overflow-hidden backdrop-blur-md animate-[scale-up_0.3s_ease-out]">
-        
-        {/* Close button */}
-        {onClose && (
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer z-10"
-            title="Cancel"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* Floating background indicator */}
-        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: color }} />
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: color }} />
-
-        {/* Lock icon badge */}
-        <div 
-          style={{ backgroundColor: `${color}15`, borderColor: `${color}30` }}
-          className="w-12 h-12 rounded-2xl border flex items-center justify-center mb-6 shadow-sm"
-        >
-          <Lock className="w-5 h-5" style={{ color }} />
-        </div>
-
-        <h3 className="text-base font-bold text-gray-800 dark:text-zinc-100 mb-1">
-          Access Seal Active
-        </h3>
-        <p className="text-[11px] text-gray-405 dark:text-zinc-400 mb-8 max-w-[260px] leading-relaxed">
-          Unlock workspace for <strong className="font-semibold text-gray-700 dark:text-zinc-200">{agentName}</strong> using biometric verification.
-        </p>
-
-        {/* Outer Scanner Ring & Fingerprint button */}
-        <div className="relative w-32 h-32 flex items-center justify-center mb-8">
+    <div className="absolute inset-0 z-[150] flex flex-col items-center justify-center backdrop-blur-xl bg-[#fafafa]/60 dark:bg-zinc-950/60 font-sans p-6 text-center select-none animate-fade-in">
+      {viewMode === 'biometrics' ? (
+        /* macOS Style Touch ID Dialog */
+        <div className="w-[300px] rounded-[18px] bg-[#ececec]/85 dark:bg-[#282828]/85 border border-[#ffffff]/20 dark:border-[#3c3c3c]/50 shadow-2xl flex flex-col items-center overflow-hidden backdrop-blur-3xl animate-[scale-up_0.25s_ease-out] text-[#1a1a1a] dark:text-[#f4f4f5]">
+          {/* Top Header spacer */}
+          <div className="w-full h-3 flex items-center justify-center" />
           
-          {/* Circular SVG Progress Ring */}
-          <svg className="absolute w-full h-full rotate-[-90deg]">
-            {/* Background track circle */}
-            <circle
-              cx="64"
-              cy="64"
-              r="40"
-              stroke="currentColor"
-              strokeWidth="3.5"
-              fill="transparent"
-              className="text-gray-100 dark:text-zinc-800"
-            />
-            {/* Foreground progress circle */}
-            <circle
-              cx="64"
-              cy="64"
-              r="40"
-              stroke={scanState === 'success' ? '#10b981' : color}
-              strokeWidth="4"
-              fill="transparent"
-              strokeDasharray="251.2"
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              className="transition-all duration-75"
-            />
-          </svg>
+          {/* Touch ID Icon */}
+          <div className="w-14 h-14 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center mt-3 mb-3 relative select-none">
+            <Fingerprint className="w-9 h-9 text-rose-500 animate-[pulse_2s_infinite]" />
+            {scanState === 'scanning' && (
+              <svg className="absolute inset-0 rotate-[-90deg] w-full h-full">
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="26"
+                  stroke={color}
+                  strokeWidth="2.5"
+                  fill="transparent"
+                  strokeDasharray="163.2"
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </div>
 
-          {/* Interactive fingerprint button */}
-          <button
+          <span className="text-xs font-bold text-center px-4 max-w-[240px] leading-tight mb-1">
+            Touch ID or Enter Password
+          </span>
+          <span className="text-[10px] text-gray-500 dark:text-[#a1a1aa] text-center px-4 max-w-[240px] leading-snug mb-5">
+            Libertrian is trying to unlock <strong className="font-semibold text-black dark:text-white">{agentName}</strong>.
+          </span>
+
+          {/* Interactive touch area overlay */}
+          <div 
             onMouseDown={startScanning}
             onMouseUp={stopScanning}
             onMouseLeave={stopScanning}
             onTouchStart={(e) => { e.preventDefault(); startScanning(); }}
             onTouchEnd={stopScanning}
-            style={{ 
-              borderColor: scanState === 'success' ? '#10b981' : (scanState === 'scanning' ? color : 'currentColor'),
-              boxShadow: scanState === 'scanning' ? `0 0 20px ${color}35` : undefined
-            }}
-            className={`w-20 h-20 rounded-full border-2 flex items-center justify-center bg-gray-50 dark:bg-zinc-800/60 transition-all duration-300 relative overflow-hidden active:scale-95 cursor-pointer ${
-              scanState === 'scanning' ? 'text-gray-900 dark:text-white border-zinc-300 dark:border-zinc-700' : 'text-gray-400 dark:text-zinc-500 hover:text-gray-700 dark:hover:text-zinc-300'
-            }`}
+            className="w-full py-2.5 bg-black/5 dark:bg-white/5 border-t border-[#000000]/10 dark:border-[#ffffff]/10 hover:bg-black/10 dark:hover:bg-white/10 active:bg-black/15 dark:active:bg-white/15 cursor-pointer text-center text-[10.5px] font-bold tracking-wide transition-colors"
           >
-            {/* Laser scan line overlay */}
-            {scanState === 'scanning' && (
-              <div 
-                style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
-                className="absolute left-0 right-0 h-0.5 animate-[scan_1.5s_ease-in-out_infinite]"
-              />
-            )}
+            {scanState === 'scanning' ? `Scanning... ${Math.round(progress)}%` : "Hold here to scan fingerprint"}
+          </div>
 
-            {scanState === 'success' ? (
-              <Check className="w-8 h-8 text-emerald-500 animate-[scale-up_0.2s_ease-out]" />
-            ) : (
-              <Fingerprint 
-                className={`w-8 h-8 transition-transform duration-300 ${scanState === 'scanning' ? 'scale-110' : ''}`}
-                style={{ color: scanState === 'scanning' ? color : undefined }}
-              />
-            )}
-          </button>
+          {/* Dialog Action Buttons */}
+          <div className="flex w-full border-t border-[#000000]/10 dark:border-[#ffffff]/10">
+            <button
+              type="button"
+              onClick={onClose || stopScanning}
+              className="flex-1 py-3 text-xs border-r border-[#000000]/10 dark:border-[#ffffff]/10 hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 dark:active:bg-white/10 cursor-pointer font-medium text-blue-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('passcode')}
+              className="flex-1 py-3 text-xs hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 dark:active:bg-white/10 cursor-pointer font-bold text-blue-500"
+            >
+              Use Password
+            </button>
+          </div>
         </div>
+      ) : (
+        /* Frosted Glass Passcode Card */
+        <form 
+          onSubmit={handlePasscodeSubmit}
+          className={`max-w-xs w-full p-6 rounded-2xl bg-white/70 dark:bg-zinc-900/70 border border-gray-200 dark:border-zinc-800 shadow-2xl flex flex-col items-center relative overflow-hidden backdrop-blur-md animate-[scale-up_0.25s_ease-out] ${
+            passcodeError ? 'animate-[shake_0.4s_ease-in-out]' : ''
+          }`}
+        >
+          <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
+            <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
+          </div>
 
-        {/* Status text */}
-        <div className="text-[10.5px] font-bold tracking-wider uppercase h-4">
-          {scanState === 'idle' && (
-            <span className="text-gray-400 dark:text-zinc-500">
-              Press and hold to scan
-            </span>
-          )}
-          {scanState === 'scanning' && (
-            <span className="animate-pulse" style={{ color }}>
-              Verifying credentials... {Math.round(progress)}%
-            </span>
-          )}
-          {scanState === 'success' && (
-            <span className="text-emerald-500 animate-[bounce_0.5s_infinite]">
-              Identity Verified
-            </span>
-          )}
-        </div>
+          <h3 className="text-sm font-bold text-gray-800 dark:text-zinc-100 mb-1">Enter Master Passcode</h3>
+          <p className="text-[10px] text-gray-450 dark:text-zinc-400 mb-5 leading-normal max-w-[200px]">
+            Input secure keys to unlock <strong className="font-semibold">{agentName}</strong>.
+          </p>
 
-      </div>
-      
-      {/* Dynamic Keyframes inject */}
+          <input
+            type="password"
+            autoFocus
+            value={passcodeInput}
+            onChange={(e) => setPasscodeInput(e.target.value)}
+            placeholder="••••••••"
+            className={`w-full px-3 py-2 text-center text-sm rounded-lg border focus:outline-none focus:ring-1 focus:ring-rose-500 tracking-widest ${
+              passcodeError ? 'border-rose-500 focus:ring-rose-500' : 'border-gray-200 dark:border-zinc-800'
+            } bg-gray-50 dark:bg-zinc-950/40 text-black dark:text-white`}
+          />
+
+          {passcodeError && (
+            <span className="text-[9.5px] text-rose-500 font-bold mt-2 animate-bounce">
+              Incorrect passcode
+            </span>
+          )}
+
+          <div className="flex w-full gap-2 mt-5">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('biometrics');
+                setPasscodeInput('');
+              }}
+              className="flex-1 py-1.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-[10px] font-bold text-gray-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
+            >
+              Touch ID
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold cursor-pointer transition-colors"
+            >
+              Verify
+            </button>
+          </div>
+        </form>
+      )}
+
       <style>{`
-        @keyframes scan {
-          0%, 100% { top: 10%; }
-          50% { top: 90%; }
-        }
         @keyframes scale-up {
-          0% { transform: scale(0.5); opacity: 0; }
+          0% { transform: scale(0.92); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-6px); }
+          75% { transform: translateX(6px); }
         }
       `}</style>
     </div>
   );
 }
+
+// Keep AgentMascot definition following it
 
 
 function AgentMascot({ name, className = "w-8 h-8" }: { name: string; className?: string }) {
@@ -677,6 +698,17 @@ export default function App() {
   const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
   const [unlockedAgentIds, setUnlockedAgentIds] = useState<string[]>([]);
   const [verifyingAgentId, setVerifyingAgentId] = useState<string | null>(null);
+  
+  // Security locks & context menu states
+  const [masterPasscode, setMasterPasscode] = useState<string | null>(() => localStorage.getItem("libertrian_master_passcode"));
+  const [isDashboardLocked, setIsDashboardLocked] = useState<boolean>(() => localStorage.getItem("libertrian_dashboard_locked") === "true");
+  const [isDashboardUnlocked, setIsDashboardUnlocked] = useState<boolean>(false);
+  const [showPasscodeSetupModal, setShowPasscodeSetupModal] = useState<boolean>(false);
+  const [passcodeSetupAgentId, setPasscodeSetupAgentId] = useState<string | 'dashboard' | null>(null);
+  const [activeContextMenu, setActiveContextMenu] = useState<{ x: number; y: number; agentId: string } | null>(null);
+  const [passcodeSetupVal, setPasscodeSetupVal] = useState("");
+  const [passcodeSetupConfirmVal, setPasscodeSetupConfirmVal] = useState("");
+  const [setupError, setSetupError] = useState("");
 
   // Companion Chat floating window states & refs
   const [activeCompanionChatAgentId, setActiveCompanionChatAgentId] = useState<string | null>(null);
@@ -690,6 +722,7 @@ export default function App() {
   const getPreferencesSectionTitle = () => {
     if (preferencesActiveSection === "account_details") return "Account Preferences";
     if (preferencesActiveSection === "account_password") return "Password Settings";
+    if (preferencesActiveSection === "security_seals") return "Security Seals";
     if (preferencesActiveSection === "ai_general") return "AI Settings";
     if (preferencesActiveSection === "ai_new_agent") return "Deploy New Agent";
     if (preferencesActiveSection.startsWith("ai_config_")) {
@@ -1098,6 +1131,19 @@ export default function App() {
       setActiveTheme(isDarkMode ? "default-dark" : "macos-classic-light");
     }
   }, [isDarkMode]);
+
+  // Global click & contextmenu listener to dismiss active custom context menus
+  useEffect(() => {
+    const dismissMenu = () => {
+      setActiveContextMenu(null);
+    };
+    window.addEventListener("click", dismissMenu);
+    window.addEventListener("contextmenu", dismissMenu);
+    return () => {
+      window.removeEventListener("click", dismissMenu);
+      window.removeEventListener("contextmenu", dismissMenu);
+    };
+  }, []);
 
   // Sync font size scaling — only called on discrete commit events, never during drag/arrow-key navigation
   useEffect(() => {
@@ -1979,9 +2025,17 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                updateAgent({ isLocked: !agent.isLocked });
                 if (agent.isLocked) {
+                  updateAgent({ isLocked: false });
                   setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                } else {
+                  if (!masterPasscode) {
+                    setPasscodeSetupAgentId(agent.id);
+                    setShowPasscodeSetupModal(true);
+                  } else {
+                    updateAgent({ isLocked: true });
+                    setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                  }
                 }
               }}
               className={`px-3 py-1.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
@@ -2250,6 +2304,165 @@ export default function App() {
                 Change Credentials
               </button>
             </form>
+          </div>
+        );
+      case "security_seals":
+        return (
+          <div className="space-y-6 font-sans max-w-lg">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Lock className="w-5 h-5 text-rose-500 animate-pulse" />
+                <span>Security Seals & Biometrics</span>
+              </h2>
+              <p className="text-xs text-gray-400">Lock down your primary active Orchestrator, individual sub-agents, or the entire agent dashboard behind system biometric scans.</p>
+            </div>
+
+            {/* Master Passcode Section */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/10 space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-gray-700 dark:text-zinc-300">Master Keys Passcode</span>
+                  <span className="text-[10px] text-gray-400">Gating password fallback for active seals</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
+                    masterPasscode 
+                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
+                      : "bg-gray-200/55 dark:bg-zinc-800 text-gray-400 dark:text-zinc-550 border-transparent"
+                  }`}>
+                    {masterPasscode ? "🔑 Configured" : "Not Set"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (masterPasscode) {
+                        if (window.confirm("Are you sure you want to reset your Master Passcode? All seals will be temporarily unlocked.")) {
+                          localStorage.removeItem("libertrian_master_passcode");
+                          setMasterPasscode(null);
+                          setAiAgents(prev => prev.map(a => ({ ...a, isLocked: false })));
+                          setIsDashboardLocked(false);
+                          localStorage.removeItem("libertrian_dashboard_locked");
+                          setUnlockedAgentIds([]);
+                          setIsDashboardUnlocked(false);
+                        }
+                      } else {
+                        setShowPasscodeSetupModal(true);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded text-[10.5px] font-bold transition-all cursor-pointer ${
+                      masterPasscode
+                        ? "border border-rose-500/40 text-rose-500 hover:bg-rose-500/5"
+                        : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
+                    }`}
+                  >
+                    {masterPasscode ? "Reset Passcode" : "Setup Passcode"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Dashboard Lock Config */}
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-900/10 space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-gray-700 dark:text-zinc-300">Global Dashboard Lock</span>
+                  <span className="text-[10px] text-gray-400">Seal the entire Deployed Agents Dashboard</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isDashboardLocked) {
+                      setIsDashboardLocked(false);
+                      setIsDashboardUnlocked(false);
+                      localStorage.removeItem("libertrian_dashboard_locked");
+                    } else {
+                      if (!masterPasscode) {
+                        setPasscodeSetupAgentId("dashboard");
+                        setShowPasscodeSetupModal(true);
+                      } else {
+                        setIsDashboardLocked(true);
+                        setIsDashboardUnlocked(false);
+                        localStorage.setItem("libertrian_dashboard_locked", "true");
+                      }
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    isDashboardLocked
+                      ? "bg-rose-500 hover:bg-rose-600 text-white shadow-sm"
+                      : "border border-gray-300 dark:border-zinc-700 text-gray-550 hover:text-gray-800 dark:hover:text-zinc-250"
+                  }`}
+                >
+                  {isDashboardLocked ? "Dashboard Locked" : "Lock Dashboard"}
+                </button>
+              </div>
+              <p className="text-[9.5px] text-gray-455 dark:text-zinc-500 italic leading-relaxed">
+                When global dashboard seal is active, accessing the main "AI Agent Dashboard" tab will require biometric scanning or master passcode verification.
+              </p>
+            </div>
+
+            {/* Individual Deployed Agent Locks */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Deployed Agent Security Seals</span>
+              <div className="border border-gray-200 dark:border-zinc-800 rounded-xl divide-y divide-gray-100 dark:divide-zinc-800/80 overflow-hidden bg-white dark:bg-zinc-950/20">
+                {aiAgents.map(agent => {
+                  const isOrch = agent.isOrchestrator;
+                  return (
+                    <div key={agent.id} className="p-3.5 flex justify-between items-center">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <AgentMascot name={agent.name} className="w-8 h-8 flex-shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-gray-800 dark:text-zinc-100 flex items-center gap-1.5">
+                            {isOrch && <span title={agent.name} style={{ color: agent.orchestratorColor || "#f59e0b" }}>👑</span>}
+                            <span>{agent.name}</span>
+                          </span>
+                          <span className="text-[9.5px] text-gray-400 truncate uppercase font-semibold tracking-wide">{agent.aiModel}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {agent.isLocked && (
+                          <select
+                            value={agent.sealType || "fully_sealed"}
+                            onChange={(e) => {
+                              const sType = e.target.value;
+                              setAiAgents(prev => prev.map(a => a.id === agent.id ? { ...a, sealType: sType as any } : a));
+                            }}
+                            className={`px-2 py-1 text-[9.5px] rounded border focus:outline-none bg-gray-50 dark:bg-zinc-950/40 border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-zinc-300`}
+                          >
+                            <option value="fully_sealed">Fully Sealed</option>
+                            <option value="orchestrator_tethered">Orchestrator-Tethered</option>
+                          </select>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (agent.isLocked) {
+                              setAiAgents(prev => prev.map(a => a.id === agent.id ? { ...a, isLocked: false } : a));
+                              setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                            } else {
+                              if (!masterPasscode) {
+                                setPasscodeSetupAgentId(agent.id);
+                                setShowPasscodeSetupModal(true);
+                              } else {
+                                setAiAgents(prev => prev.map(a => a.id === agent.id ? { ...a, isLocked: true } : a));
+                                setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                              }
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            agent.isLocked
+                              ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/20"
+                              : "border border-gray-300 dark:border-zinc-700 text-gray-500 hover:text-gray-800 dark:hover:text-zinc-200"
+                          }`}
+                        >
+                          {agent.isLocked ? "Sealed 🔒" : "Seal Agent"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
       case "ai_agent_placeholder":
@@ -3450,6 +3663,20 @@ export default function App() {
                     setActiveTab(idx);
                     setHoveredTooltip(null);
                   }}
+                  onContextMenu={(e) => {
+                    if (idx === 4) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const activeOrch = aiAgents.find(a => a.isOrchestrator) || aiAgents[0];
+                      if (activeOrch) {
+                        setActiveContextMenu({ x: e.clientX, y: e.clientY, agentId: activeOrch.id });
+                      }
+                    } else if (idx === 5) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setActiveContextMenu({ x: e.clientX, y: e.clientY, agentId: "dashboard" });
+                    }
+                  }}
                   onMouseEnter={(e) => {
                     if (menuBarIconStyle !== "full") {
                       setHoveredTooltip({ text: tab.label, rect: e.currentTarget.getBoundingClientRect() });
@@ -3463,7 +3690,19 @@ export default function App() {
                   {isActive && (
                     <div className={`absolute left-0 w-[3px] h-6 rounded-r ${isOrchTab ? "bg-amber-500" : "bg-emerald-500"}`} />
                   )}
-                  <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? (isOrchTab ? "text-amber-500" : "text-emerald-500") : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                  <div className="relative flex-shrink-0">
+                    <IconComponent className={`w-5 h-5 transition-colors ${isActive ? (isOrchTab ? "text-amber-500" : "text-emerald-500") : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                    {tab.label === orchName && activeOrch && activeOrch.isLocked && (
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-amber-500 text-white flex items-center justify-center border border-white dark:border-zinc-900 shadow-sm animate-pulse scale-90">
+                        <Lock className="w-1.5 h-1.5" />
+                      </div>
+                    )}
+                    {tab.label === "Agent" && isDashboardLocked && (
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-rose-500 text-white flex items-center justify-center border border-white dark:border-zinc-900 shadow-sm animate-pulse scale-90">
+                        <Lock className="w-1.5 h-1.5" />
+                      </div>
+                    )}
+                  </div>
                   
                   {menuBarIconStyle === "full" && (
                     <span className={`text-[11px] font-bold transition-colors ${isActive ? (isOrchTab ? "text-amber-500 font-extrabold" : "text-emerald-500 font-extrabold") : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
@@ -3489,6 +3728,11 @@ export default function App() {
                         setActiveAgentChatId(agentId);
                         setHoveredTooltip(null);
                       }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveContextMenu({ x: e.clientX, y: e.clientY, agentId });
+                      }}
                       onMouseEnter={(e) => {
                         if (menuBarIconStyle !== "full") {
                           setHoveredTooltip({ text: `${agent.name} Workspace`, rect: e.currentTarget.getBoundingClientRect() });
@@ -3502,7 +3746,14 @@ export default function App() {
                       {isAgentActive && (
                         <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
                       )}
-                      <AgentMascot name={agent.name} className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "animate-pulse" : ""}`} />
+                      <div className="relative flex-shrink-0">
+                        <AgentMascot name={agent.name} className={`w-5 h-5 transition-colors ${isAgentActive ? "animate-pulse" : ""}`} />
+                        {agent.isLocked && (
+                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full text-white flex items-center justify-center border border-white dark:border-zinc-900 shadow-sm animate-pulse scale-90 ${agent.isOrchestrator ? "bg-amber-500" : "bg-rose-500"}`}>
+                            <Lock className="w-1.5 h-1.5" />
+                          </div>
+                        )}
+                      </div>
                       {menuBarIconStyle === "full" && (
                         <span className={`text-[11px] font-bold transition-colors ${isAgentActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
                           {agent.name}
@@ -4742,15 +4993,31 @@ export default function App() {
           })()}
 
           {/* Tab 5: AI Agent Dashboard */}
-          {!activeAgentChatId && activeTab === 5 && (
-            <div className="flex flex-col h-full w-full p-6 gap-6 overflow-y-auto font-sans bg-white dark:bg-[#09090b]">
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Bot className="w-6 h-6 text-emerald-500" />
-                  <span>AI Agent Dashboard</span>
-                </h1>
-                <p className="text-sm text-gray-400 dark:text-[#a1a1aa] mt-1">Deploy, monitor, and configure your specialized AI agents.</p>
-              </div>
+          {!activeAgentChatId && activeTab === 5 && (() => {
+            const isDashLocked = isDashboardLocked && !isDashboardUnlocked;
+            if (isDashLocked) {
+              return (
+                <div className="flex-1 h-full w-full relative bg-white dark:bg-[#09090b]">
+                  <BiometricLockOverlay
+                    agentName="Agent Dashboard"
+                    color="#10b981"
+                    onUnlock={() => {
+                      setIsDashboardUnlocked(true);
+                    }}
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <div className="flex flex-col h-full w-full p-6 gap-6 overflow-y-auto font-sans bg-white dark:bg-[#09090b]">
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <Bot className="w-6 h-6 text-emerald-500" />
+                    <span>AI Agent Dashboard</span>
+                  </h1>
+                  <p className="text-sm text-gray-400 dark:text-[#a1a1aa] mt-1">Deploy, monitor, and configure your specialized AI agents.</p>
+                </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-shrink-0">
                 {aiAgents.map(agent => {
@@ -4840,10 +5107,15 @@ export default function App() {
                                if (agent.isLocked) {
                                  setVerifyingAgentId(agent.id);
                                } else {
-                                 setAiAgents(prev => prev.map(a => 
-                                   a.id === agent.id ? { ...a, isLocked: true } : a
-                                 ));
-                                 setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                                 if (!masterPasscode) {
+                                   setPasscodeSetupAgentId(agent.id);
+                                   setShowPasscodeSetupModal(true);
+                                 } else {
+                                   setAiAgents(prev => prev.map(a => 
+                                     a.id === agent.id ? { ...a, isLocked: true } : a
+                                   ));
+                                   setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+                                 }
                                }
                              }}
                              title={agent.isLocked ? "Unlock Security Seal" : "Engage Security Seal"}
@@ -4919,7 +5191,8 @@ export default function App() {
                 );
               })()}
             </div>
-          )}
+          );
+        })()}
 
           {/* Tab 6: Settings */}
           {activeTab === 6 && (
@@ -5237,7 +5510,8 @@ export default function App() {
                       icon: User,
                       children: [
                         { id: "account_details", label: "Account" },
-                        { id: "account_password", label: "Password" }
+                        { id: "account_password", label: "Password" },
+                        { id: "security_seals", label: "Security Seals" }
                       ]
                     },
                     {
@@ -5588,6 +5862,201 @@ export default function App() {
                   );
                 })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar Right-Click Context Menu */}
+      {activeContextMenu && (() => {
+        const targetAgentId = activeContextMenu.agentId;
+        const isDashTarget = targetAgentId === "dashboard";
+        
+        let label = "Agent Dashboard";
+        let isLocked = isDashboardLocked;
+        let isPinned = false;
+
+        const agent = aiAgents.find(a => a.id === targetAgentId);
+        if (agent) {
+          label = agent.name;
+          isLocked = !!agent.isLocked;
+          isPinned = pinnedAgentIds.includes(agent.id);
+        }
+
+        const handleToggleSeal = () => {
+          setActiveContextMenu(null);
+          if (isDashTarget) {
+            if (isDashboardLocked) {
+              setIsDashboardLocked(false);
+              setIsDashboardUnlocked(false);
+              localStorage.removeItem("libertrian_dashboard_locked");
+            } else {
+              if (!masterPasscode) {
+                setPasscodeSetupAgentId("dashboard");
+                setShowPasscodeSetupModal(true);
+              } else {
+                setIsDashboardLocked(true);
+                setIsDashboardUnlocked(false);
+                localStorage.setItem("libertrian_dashboard_locked", "true");
+              }
+            }
+          } else if (agent) {
+            if (agent.isLocked) {
+              setVerifyingAgentId(agent.id);
+            } else {
+              if (!masterPasscode) {
+                setPasscodeSetupAgentId(agent.id);
+                setShowPasscodeSetupModal(true);
+              } else {
+                setAiAgents(prev => prev.map(a => a.id === agent.id ? { ...a, isLocked: true } : a));
+                setUnlockedAgentIds(prev => prev.filter(id => id !== agent.id));
+              }
+            }
+          }
+        };
+
+        const handleTogglePin = () => {
+          setActiveContextMenu(null);
+          if (agent) {
+            setPinnedAgentIds(prev => 
+              prev.includes(agent.id) 
+                ? prev.filter(id => id !== agent.id) 
+                : [...prev, agent.id]
+            );
+          }
+        };
+
+        return (
+          <div 
+            style={{ 
+              position: "fixed",
+              left: `${activeContextMenu.x}px`,
+              top: `${activeContextMenu.y}px`,
+            }}
+            className="z-[200] w-48 rounded-xl bg-white/85 dark:bg-zinc-900/85 border border-gray-200 dark:border-zinc-800/80 shadow-2xl p-1 flex flex-col backdrop-blur-md text-[11px] font-medium font-sans animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-2.5 py-1.5 text-gray-400 dark:text-zinc-550 border-b border-gray-100 dark:border-zinc-800/60 font-semibold select-none">
+              {label} Actions
+            </div>
+
+            <button
+              onClick={handleToggleSeal}
+              className="w-full text-left px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-gray-700 dark:text-zinc-200"
+            >
+              <Lock className="w-3.5 h-3.5 text-gray-450" />
+              <span>{isLocked ? "Remove Security Seal" : "Engage Security Seal"}</span>
+            </button>
+
+            {!isDashTarget && agent && (
+              <button
+                onClick={handleTogglePin}
+                className="w-full text-left px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-2 transition-colors cursor-pointer text-gray-700 dark:text-zinc-200"
+              >
+                <PinOff className="w-3.5 h-3.5 text-gray-450" />
+                <span>{isPinned ? "Unpin Shortcut" : "Pin to Sidebar"}</span>
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Master Passcode Setup Modal */}
+      {showPasscodeSetupModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[250] font-sans animate-fade-in">
+          <div className="max-w-xs w-full p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl flex flex-col items-center relative overflow-hidden backdrop-blur-md animate-[scale-up_0.25s_ease-out]">
+            
+            <button 
+              type="button"
+              onClick={() => {
+                setShowPasscodeSetupModal(false);
+                setPasscodeSetupAgentId(null);
+                setPasscodeSetupVal("");
+                setPasscodeSetupConfirmVal("");
+                setSetupError("");
+              }}
+              className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-400 dark:text-zinc-500 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+              <Lock className="w-4 h-4 text-emerald-500 animate-pulse" />
+            </div>
+
+            <h3 className="text-sm font-bold text-gray-800 dark:text-zinc-100 mb-1">Create Master Passcode</h3>
+            <p className="text-[10px] text-gray-450 dark:text-zinc-400 mb-5 leading-normal text-center">
+              Set a master keys passcode to enable security locks/seals.
+            </p>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (passcodeSetupVal.length < 4) {
+                  setSetupError("Passcode must be at least 4 digits");
+                  return;
+                }
+                if (passcodeSetupVal !== passcodeSetupConfirmVal) {
+                  setSetupError("Passcodes do not match");
+                  return;
+                }
+                localStorage.setItem("libertrian_master_passcode", passcodeSetupVal);
+                setMasterPasscode(passcodeSetupVal);
+                setShowPasscodeSetupModal(false);
+                setPasscodeSetupVal("");
+                setPasscodeSetupConfirmVal("");
+                setSetupError("");
+
+                if (passcodeSetupAgentId === "dashboard") {
+                  setIsDashboardLocked(true);
+                  setIsDashboardUnlocked(false);
+                  localStorage.setItem("libertrian_dashboard_locked", "true");
+                } else if (passcodeSetupAgentId) {
+                  setAiAgents(prev => prev.map(a => 
+                    a.id === passcodeSetupAgentId ? { ...a, isLocked: true } : a
+                  ));
+                  setUnlockedAgentIds(prev => prev.filter(id => id !== passcodeSetupAgentId));
+                }
+                setPasscodeSetupAgentId(null);
+              }}
+              className="w-full space-y-3"
+            >
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-450 dark:text-zinc-500 uppercase tracking-wider">Passcode Input</label>
+                <input
+                  type="password"
+                  required
+                  value={passcodeSetupVal}
+                  onChange={(e) => setPasscodeSetupVal(e.target.value)}
+                  placeholder="Create Passcode"
+                  className="w-full px-3 py-1.5 text-center text-xs rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/40 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-gray-450 dark:text-zinc-500 uppercase tracking-wider">Confirm Passcode</label>
+                <input
+                  type="password"
+                  required
+                  value={passcodeSetupConfirmVal}
+                  onChange={(e) => setPasscodeSetupConfirmVal(e.target.value)}
+                  placeholder="Re-enter Passcode"
+                  className="w-full px-3 py-1.5 text-center text-xs rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950/40 text-black dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {setupError && (
+                <div className="text-[9.5px] text-rose-500 font-bold text-center animate-bounce">
+                  {setupError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer mt-2"
+              >
+                Create Seal Passcode
+              </button>
+            </form>
           </div>
         </div>
       )}
