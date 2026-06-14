@@ -310,3 +310,28 @@ Resolved sidebar tooltip clipping issues caused by scrollable container layout b
 - **Theme-Adaptive Styling:** Configured tooltip colors to adapt to active light/dark modes (`bg-white border-gray-250 text-zinc-900` in light mode, and `bg-zinc-950 border-zinc-800 text-zinc-50` in dark mode).
 - **Pinned Agent Mascot Avatars:** Replaced generic `<Bot />` icons in the sidebar pinned list with the custom dynamic `<AgentMascot name={agent.name} />` SVG component, creating a high-fidelity visual alignment with the Agent Dashboard layout.
 
+---
+
+## Entry 13 — Workspace Header Polish & Floating Companion Chat
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 1.5 Pro | **Effort:** Medium
+
+### Summary
+Redesigned the agent 1-on-1 workspace header with a Back button and PinOff icon replacing the scary Trash can icon, added a detach button, and implemented a draggable floating Companion Chat widget matching the provided user design mockups.
+
+### Technical Details
+- **Workspace Header Polish:**
+  - Integrated a back button (`ArrowLeft`) pointing left next to the agent's mascot that returns the user to the main Agent Dashboard by setting `activeAgentChatId(null)`.
+  - Swapped the unpin button's `<Trash2 />` icon for a `<PinOff />` icon to clarify that the action only unpins the agent from the sidebar rather than deleting it.
+  - Added a "Companion Chat" button next to "Unpin Agent" using a custom pop-out double-square SVG icon.
+- **Draggable Companion Chat Widget:**
+  - Implemented a floating window styled as a glassmorphic/semitransparent panel with heavy rounded corners (`rounded-[28px]`), a close `✕` button on the left, and pop-in/configure controls on the right.
+  - Added drag-event triggers (`onMouseDown`) to update the widget's fixed position (`companionChatPos`) in the viewport.
+  - Configured full messaging synchronization: chatting in the floating widget updates the active agent's `chatHistory` state, keeping history aligned between the main workspace and the companion chat.
+  - Rendered a premium input pill with Web search, workspace files, text size (A), targeted search, voice recording, and submit arrow buttons.
+- **Utility Quick Actions:** Mounted copy response, text-to-speech, and history-reset triggers right above the message input bar.
+
+

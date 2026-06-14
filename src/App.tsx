@@ -33,7 +33,15 @@ import {
   Search,
   Landmark,
   Trash2,
-  Star
+  Star,
+  ArrowLeft,
+  PinOff,
+  SquarePen,
+  Volume2,
+  Mic,
+  FileText,
+  X,
+  Copy
 } from "lucide-react";
 
 // Orange mascot avatar component
@@ -55,6 +63,15 @@ function OrangeMascot({ className = "w-9 h-9" }: { className?: string }) {
       <circle cx="64" cy="48" r="4.5" fill="#000" />
       {/* Cute cheeks/mouth */}
       <path d="M42 60 C44 58, 48 58, 50 60 C52 58, 56 58, 58 60 C59 62, 56 65, 50 65 C44 65, 41 62, 42 60 Z" fill="#FFF" />
+    </svg>
+  );
+}
+
+function CompanionIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M15 21H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" />
+      <rect x="11" y="3" width="10" height="10" rx="2" />
     </svg>
   );
 }
@@ -448,6 +465,15 @@ export default function App() {
   const [pinnedAgentIds, setPinnedAgentIds] = useState<string[]>([]);
   const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
 
+  // Companion Chat floating window states & refs
+  const [activeCompanionChatAgentId, setActiveCompanionChatAgentId] = useState<string | null>(null);
+  const [companionChatPos, setCompanionChatPos] = useState({ x: window.innerWidth - 450, y: 150 });
+  const [companionChatInput, setCompanionChatInput] = useState("");
+  const isDraggingCompanionChat = useRef(false);
+  const dragCompanionStart = useRef({ x: 0, y: 0 });
+  const dragCompanionOffset = useRef({ x: window.innerWidth - 450, y: 150 });
+  const companionChatOffsetRef = useRef({ x: window.innerWidth - 450, y: 150 });
+
   const getPreferencesSectionTitle = () => {
     if (preferencesActiveSection === "account_details") return "Account Preferences";
     if (preferencesActiveSection === "account_password") return "Password Settings";
@@ -485,19 +511,39 @@ export default function App() {
           {/* Header */}
           <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
             <div className="flex items-center gap-2">
-              <Bot className="w-4.5 h-4.5 text-emerald-500 animate-pulse" />
+              <button
+                onClick={() => setActiveAgentChatId(null)}
+                className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded transition-colors cursor-pointer mr-1"
+                title="Back to Agent Dashboard"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
+              </button>
+              <AgentMascot name={agent.name} className="w-5 h-5 flex-shrink-0 animate-pulse" />
               <span className="font-bold">{agent.name} Workspace</span>
             </div>
-            <button
-              onClick={() => {
-                setPinnedAgentIds(prev => prev.filter(id => id !== agentId));
-                setActiveAgentChatId(null);
-              }}
-              className="text-[10px] font-bold text-gray-450 hover:text-rose-500 transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              <Trash2 className="w-3 h-3" />
-              <span>Unpin Agent</span>
-            </button>
+            <div className="flex items-center">
+              <button
+                onClick={() => {
+                  setActiveCompanionChatAgentId(agentId);
+                  setActiveAgentChatId(null);
+                }}
+                className="text-[10px] font-bold text-gray-450 hover:text-emerald-500 transition-colors flex items-center gap-1.5 cursor-pointer mr-4"
+                title="Pop-out Companion Chat"
+              >
+                <CompanionIcon className="w-3.5 h-3.5" />
+                <span>Companion Chat</span>
+              </button>
+              <button
+                onClick={() => {
+                  setPinnedAgentIds(prev => prev.filter(id => id !== agentId));
+                  setActiveAgentChatId(null);
+                }}
+                className="text-[10px] font-bold text-gray-450 hover:text-rose-500 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <PinOff className="w-3.5 h-3.5" />
+                <span>Unpin Agent</span>
+              </button>
+            </div>
           </span>
 
           {/* Message History */}
@@ -889,6 +935,16 @@ export default function App() {
         const newW = Math.min(350, Math.max(160, dragStartSettingsWidth.current + delta));
         setSettingsSidebarWidth(newW);
       }
+      if (isDraggingCompanionChat.current) {
+        const dx = e.clientX - dragCompanionStart.current.x;
+        const dy = e.clientY - dragCompanionStart.current.y;
+        const newPos = {
+          x: dragCompanionOffset.current.x + dx,
+          y: dragCompanionOffset.current.y + dy,
+        };
+        companionChatOffsetRef.current = newPos;
+        setCompanionChatPos(newPos);
+      }
     };
     const onUp = () => {
       isDraggingLedger.current = false;
@@ -913,6 +969,10 @@ export default function App() {
       if (isDraggingModalResize.current) {
         isDraggingModalResize.current = false;
         setIsModalBeingResized(false);
+      }
+      if (isDraggingCompanionChat.current) {
+        isDraggingCompanionChat.current = false;
+        dragCompanionOffset.current = { x: companionChatOffsetRef.current.x, y: companionChatOffsetRef.current.y };
       }
     };
     window.addEventListener("mousemove", onMove);
@@ -1134,6 +1194,52 @@ export default function App() {
     setIsAgentTyping(true);
 
     // Get current active agent specs
+    const targetAgent = aiAgents.find(a => a.id === agentId);
+    const aName = targetAgent ? targetAgent.name : "Agent";
+    const aCron = targetAgent ? targetAgent.cron : "";
+    const aInst = targetAgent ? targetAgent.instructions : "";
+
+    setTimeout(() => {
+      let replyText = "";
+      const lower = userMsg.toLowerCase();
+      if (lower.includes("status") || lower.includes("hello") || lower.includes("hi")) {
+        replyText = `Hello! I am ${aName}, active and monitoring the market. My cron job schedule is currently set to: "${aCron}". Core instructions: "${aInst}".`;
+      } else if (lower.includes("cron") || lower.includes("schedule")) {
+        replyText = `Understood. I will run the task: "${aInst}" according to schedule: "${aCron}".`;
+      } else {
+        replyText = `Acknowledged. Executing instructions. Action: "${userMsg}" is parsed under guidelines: "${aInst}".`;
+      }
+      
+      setAiAgents(prev => prev.map(agent => {
+        if (agent.id === agentId) {
+          return {
+            ...agent,
+            chatHistory: [...agent.chatHistory, { sender: "agent", text: replyText }]
+          };
+        }
+        return agent;
+      }));
+      setIsAgentTyping(false);
+    }, 600);
+  };
+
+  const handleSendCompanionMessage = (agentId: string) => {
+    if (!companionChatInput.trim()) return;
+    const userMsg = companionChatInput;
+    
+    setAiAgents(prev => prev.map(agent => {
+      if (agent.id === agentId) {
+        return {
+          ...agent,
+          chatHistory: [...agent.chatHistory, { sender: "user", text: userMsg }]
+        };
+      }
+      return agent;
+    }));
+    
+    setCompanionChatInput("");
+    setIsAgentTyping(true);
+
     const targetAgent = aiAgents.find(a => a.id === agentId);
     const aName = targetAgent ? targetAgent.name : "Agent";
     const aCron = targetAgent ? targetAgent.cron : "";
@@ -4948,6 +5054,199 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Companion Chat Panel */}
+      {activeCompanionChatAgentId && (() => {
+        const agent = aiAgents.find(a => a.id === activeCompanionChatAgentId);
+        if (!agent) return null;
+
+        return (
+          <div
+            style={{
+              position: "fixed",
+              left: `${companionChatPos.x}px`,
+              top: `${companionChatPos.y}px`,
+              width: "370px",
+              height: "500px",
+            }}
+            className="z-[999] bg-gray-50/95 dark:bg-zinc-900/95 border border-gray-250 dark:border-zinc-800 rounded-[28px] shadow-2xl flex flex-col overflow-hidden backdrop-blur-md font-sans text-xs select-none"
+          >
+            {/* Header / Drag Bar */}
+            <div
+              onMouseDown={(e) => {
+                isDraggingCompanionChat.current = true;
+                dragCompanionStart.current = { x: e.clientX, y: e.clientY };
+                dragCompanionOffset.current = { x: companionChatPos.x, y: companionChatPos.y };
+                companionChatOffsetRef.current = { x: companionChatPos.x, y: companionChatPos.y };
+                document.body.style.cursor = "grabbing";
+                document.body.style.userSelect = "none";
+              }}
+              className="px-4 py-3 bg-[#fafafa] dark:bg-[#121214] border-b border-gray-250 dark:border-zinc-800 flex justify-between items-center cursor-grab active:cursor-grabbing"
+            >
+              {/* Close Button on the left */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveCompanionChatAgentId(null);
+                }}
+                className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 flex items-center justify-center text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Title / Agent Name */}
+              <div className="flex items-center gap-1.5 pointer-events-none">
+                <AgentMascot name={agent.name} className="w-4 h-4 flex-shrink-0" />
+                <span className="font-bold text-gray-700 dark:text-zinc-200">{agent.name} Companion</span>
+              </div>
+
+              {/* Top-Right Controls */}
+              <div className="flex items-center gap-1.5" onMouseDown={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => {
+                    setActiveAgentChatId(activeCompanionChatAgentId);
+                    setActiveCompanionChatAgentId(null);
+                  }}
+                  title="Open in Main Window (⌘O)"
+                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
+                >
+                  <CompanionIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setPreferencesActiveSection(`ai_config_${activeCompanionChatAgentId}`);
+                    setShowPreferencesModal(true);
+                    setIsSettingsDockedToSidebar(false);
+                  }}
+                  title="Configure Agent"
+                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 dark:text-zinc-400 cursor-pointer transition-colors"
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Conversation Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-[#18181b]">
+              {agent.chatHistory.map((msg, idx) => (
+                <div key={idx} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+                  <span className="text-[8.5px] text-gray-400 dark:text-zinc-500 font-bold mb-0.5">
+                    {msg.sender === "user" ? "You" : agent.name}
+                  </span>
+                  <div className={`px-3 py-2 rounded-xl max-w-[85%] leading-relaxed ${
+                    msg.sender === "user"
+                      ? "bg-emerald-500 text-white font-semibold rounded-tr-none"
+                      : "bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-150 rounded-tl-none font-medium"
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {isAgentTyping && (
+                <div className="flex flex-col items-start">
+                  <span className="text-[8.5px] text-gray-400 dark:text-zinc-550 font-bold mb-0.5">{agent.name}</span>
+                  <div className="px-3 py-2 rounded-xl bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-400 rounded-tl-none italic animate-pulse">
+                    typing...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions & Input Panel */}
+            <div className="p-3 bg-[#fafafa] dark:bg-[#121214] border-t border-gray-200 dark:border-zinc-800 flex flex-col gap-2">
+              {/* Utility Row: Copy, Volume/TTS, Refresh */}
+              <div className="flex items-center gap-3 px-1.5 text-gray-400 dark:text-zinc-500">
+                <button
+                  onClick={() => {
+                    const lastMsg = agent.chatHistory[agent.chatHistory.length - 1];
+                    if (lastMsg) navigator.clipboard.writeText(lastMsg.text);
+                  }}
+                  title="Copy last response"
+                  className="hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => {
+                    const lastMsg = agent.chatHistory[agent.chatHistory.length - 1];
+                    if (lastMsg) {
+                      const utterance = new SpeechSynthesisUtterance(lastMsg.text);
+                      window.speechSynthesis.speak(utterance);
+                    }
+                  }}
+                  title="Text-to-Speech"
+                  className="hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => {
+                    setAiAgents(prev => prev.map(a => {
+                      if (a.id === activeCompanionChatAgentId) {
+                        return {
+                          ...a,
+                          chatHistory: [
+                            { sender: "agent", text: "Conversation history reloaded and sync state cleared." }
+                          ]
+                        };
+                      }
+                      return a;
+                    }));
+                  }}
+                  title="Reset history"
+                  className="hover:text-gray-700 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Premium Input Pill */}
+              <div className="rounded-full bg-gray-100 dark:bg-zinc-800/80 border border-gray-250 dark:border-zinc-700 px-3 py-1.5 flex items-center gap-2">
+                {/* Left side tool icons */}
+                <div className="flex items-center gap-1.5 text-gray-400 dark:text-zinc-500">
+                  <button title="Web search context" className="hover:text-zinc-300 transition-colors cursor-pointer">
+                    <Globe className="w-3.5 h-3.5" />
+                  </button>
+                  <button title="Workspace files" className="hover:text-zinc-300 transition-colors cursor-pointer">
+                    <FileText className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-bold select-none px-0.5 hover:text-zinc-300 transition-colors cursor-pointer">A</span>
+                </div>
+
+                {/* Main Input Textbox */}
+                <input
+                  type="text"
+                  placeholder="Describe a task"
+                  value={companionChatInput}
+                  onChange={(e) => setCompanionChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSendCompanionMessage(activeCompanionChatAgentId);
+                  }}
+                  className="flex-1 bg-transparent text-xs text-zinc-800 dark:text-zinc-150 focus:outline-none placeholder-gray-400"
+                />
+
+                {/* Right side tool icons */}
+                <div className="flex items-center gap-1.5 text-gray-400 dark:text-zinc-500">
+                  <button title="Targeted index search" className="hover:text-zinc-300 transition-colors cursor-pointer">
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                  <button title="Voice recording" className="hover:text-zinc-300 transition-colors cursor-pointer">
+                    <Mic className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleSendCompanionMessage(activeCompanionChatAgentId)}
+                    className="p-1 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3 h-3 rotate-90" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {hoveredTooltip && (
         <div 
           style={{ 
