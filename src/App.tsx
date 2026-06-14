@@ -242,6 +242,12 @@ export default function App() {
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const [preferencesActiveSection, setPreferencesActiveSection] = useState("general_basic");
   const [settingsSearchQuery, setSettingsSearchQuery] = useState("");
+  const [settingsSidebarWidth, setSettingsSidebarWidth] = useState(240);
+  const [isSettingsSidebarCollapsed, setIsSettingsSidebarCollapsed] = useState(false);
+  const isDraggingSettingsSidebar = useRef(false);
+  const dragStartSettingsX = useRef(0);
+  const dragStartSettingsWidth = useRef(0);
+  const [isMapResizing, setIsMapResizing] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -255,7 +261,10 @@ export default function App() {
 
   // Custom functional preference settings
   const [quoteColorUpGreen, setQuoteColorUpGreen] = useState(true);
-  const [fontSizeScale, setFontSizeScale] = useState(14); // base scale in pixels (default 14 is the center dot)
+  const [fontSizeScale, setFontSizeScale] = useState(14);
+  const [sliderDisplayValue, setSliderDisplayValue] = useState(14); // tracks thumb position during drag without triggering DOM relayout
+  const fontSliderRef = useRef<HTMLInputElement>(null);
+  const fontCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [menuBarIconStyle, setMenuBarIconStyle] = useState<"icon" | "full" | "hidden">("icon");
   const [activeTheme, setActiveTheme] = useState("default-dark");
   const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(true);
@@ -278,8 +287,8 @@ export default function App() {
   const [preferencesExpanded, setPreferencesExpanded] = useState({
     account: false,
     ai: false,
-    general: true,
-    chart: true
+    general: false,
+    chart: false
   });
 
   // Custom dropdown selector state
@@ -399,7 +408,7 @@ export default function App() {
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [svgPaths, setSvgPaths] = useState<{
-    connections: { d: string; dotStyle: React.CSSProperties }[];
+    connections: { d: string; active: boolean; dotStyle: React.CSSProperties }[];
     routerToPortfolio: { d: string; dotStyle: React.CSSProperties } | null;
   }>({ connections: [], routerToPortfolio: null });
 
@@ -583,9 +592,12 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Sync font size scaling
+  // Sync font size scaling — only called on discrete commit events, never during drag/arrow-key navigation
   useEffect(() => {
     document.documentElement.style.fontSize = `${(fontSizeScale / 13) * 100}%`;
+    // NOTE: intentionally NOT setting sliderDisplayValue here — that causes an extra
+    // re-render which steals focus from the slider during arrow-key navigation.
+    // Each call site that changes fontSizeScale is responsible for also syncing sliderDisplayValue.
   }, [fontSizeScale]);
 
   // Global escape-key listener to close overlays
@@ -634,12 +646,23 @@ export default function App() {
         const newH = Math.min(450, Math.max(160, dragStartMapHeight.current + delta));
         setMapHeight(newH);
       }
+      if (isDraggingSettingsSidebar.current) {
+        const delta = e.clientX - dragStartSettingsX.current;
+        const newW = Math.min(350, Math.max(160, dragStartSettingsWidth.current + delta));
+        setSettingsSidebarWidth(newW);
+      }
     };
     const onUp = () => {
       isDraggingLedger.current = false;
       isDraggingLeftPanel.current = false;
       isDraggingRightPanel.current = false;
-      isDraggingMapHeight.current = false;
+      if (isDraggingMapHeight.current) {
+        isDraggingMapHeight.current = false;
+        setIsMapResizing(false);
+      }
+      if (isDraggingSettingsSidebar.current) {
+        isDraggingSettingsSidebar.current = false;
+      }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       setIsDraggingLeft(false);
@@ -664,9 +687,13 @@ export default function App() {
       const parent = mapWrapperRef.current;
       if (!parent) return;
 
-      const parentRect = parent.getBoundingClientRect();
-      const routerEl = parent.querySelector(".ingestion-router-box");
-      const portfolioEl = parent.querySelector(".local-portfolio-box");
+      // Use the scrollable inner flex row as coordinate origin
+      const flexRow = parent.querySelector(".map-flex-row") as HTMLElement | null;
+      const origin = flexRow ?? parent;
+      const originRect = origin.getBoundingClientRect();
+
+      const routerEl = parent.querySelector(".ingestion-router-box") as HTMLElement | null;
+      const portfolioEl = parent.querySelector(".local-portfolio-box") as HTMLElement | null;
       const categoryEls = parent.querySelectorAll(".category-box-node");
 
       if (!routerEl || !portfolioEl || categoryEls.length === 0) return;
@@ -674,34 +701,35 @@ export default function App() {
       const routerRect = routerEl.getBoundingClientRect();
       const portfolioRect = portfolioEl.getBoundingClientRect();
 
-      // Ingestion Router left edge center relative to parent
-      const routerLeftX = routerRect.left - parentRect.left;
-      const routerLeftY = (routerRect.top + routerRect.bottom) / 2 - parentRect.top;
+      // All coords relative to the flex row origin
+      const routerLeftX = routerRect.left - originRect.left;
+      const routerLeftY = (routerRect.top + routerRect.bottom) / 2 - originRect.top;
 
-      // Ingestion Router right edge center relative to parent
-      const routerRightX = routerRect.right - parentRect.left;
-      const routerRightY = (routerRect.top + routerRect.bottom) / 2 - parentRect.top;
+      const routerRightX = routerRect.right - originRect.left;
+      const routerRightY = (routerRect.top + routerRect.bottom) / 2 - originRect.top;
 
-      // Local Portfolio left edge center relative to parent
-      const portfolioLeftX = portfolioRect.left - parentRect.left;
-      const portfolioLeftY = (portfolioRect.top + portfolioRect.bottom) / 2 - parentRect.top;
+      const portfolioLeftX = portfolioRect.left - originRect.left;
+      const portfolioLeftY = (portfolioRect.top + portfolioRect.bottom) / 2 - originRect.top;
 
-      const newConnections: { d: string; dotStyle: React.CSSProperties }[] = [];
+      const newConnections: { d: string; active: boolean; dotStyle: React.CSSProperties }[] = [];
 
       categoryEls.forEach((el, index) => {
         const rect = el.getBoundingClientRect();
-        // Category right edge center relative to parent
-        const fromX = rect.right - parentRect.left;
-        const fromY = (rect.top + rect.bottom) / 2 - parentRect.top;
+        const catName = el.getAttribute("data-category") || "";
+        const hasActive = ingestionConnections.some(c => c.category === catName && (c.status === "Active" || c.status === "Routing" || c.status === "Connected"));
 
+        // Start from right-center of each category card
+        const fromX = rect.right - originRect.left;
+        const fromY = (rect.top + rect.bottom) / 2 - originRect.top;
+
+        // Cubic bezier: horizontal control points for smooth S-curve
         const ctrlX = (fromX + routerLeftX) / 2;
         const pathD = `M ${fromX} ${fromY} C ${ctrlX} ${fromY}, ${ctrlX} ${routerLeftY}, ${routerLeftX} ${routerLeftY}`;
 
         newConnections.push({
           d: pathD,
-          dotStyle: {
-            animationDelay: `${index * 0.4}s`
-          }
+          active: hasActive,
+          dotStyle: { animationDelay: `${index * 0.4}s` }
         });
       });
 
@@ -734,7 +762,17 @@ export default function App() {
     isDraggingMapHeight.current = true;
     dragStartMapY.current = e.clientY;
     dragStartMapHeight.current = mapHeight;
+    setIsMapResizing(true);
     document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  const handleSettingsSidebarDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingSettingsSidebar.current = true;
+    dragStartSettingsX.current = e.clientX;
+    dragStartSettingsWidth.current = settingsSidebarWidth;
+    document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   };
 
@@ -1673,39 +1711,106 @@ export default function App() {
 
               {/* Font Size Scaling */}
               <div className="space-y-2 pb-3 border-b border-gray-100 dark:border-zinc-800/60">
-                <span className="text-xs font-bold text-gray-600 dark:text-zinc-300 block">Font Size</span>
-                <div className="relative pt-1 max-w-sm">
-                  <input 
-                    type="range" 
-                    min="11" 
-                    max="17" 
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-600 dark:text-zinc-300">Font Size</span>
+                  {/* Editable px input — commits immediately */}
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={11}
+                      max={17}
+                      value={fontSizeScale}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v) && v >= 11 && v <= 17) {
+                          setSliderDisplayValue(v); // keep thumb in sync
+                          setFontSizeScale(v);
+                        }
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="w-10 text-center text-[11px] font-mono font-bold text-gray-500 dark:text-zinc-400 bg-transparent border-b border-gray-300 dark:border-zinc-700 focus:outline-none focus:border-blue-500 cursor-text appearance-none"
+                      style={{ MozAppearance: "textfield" } as React.CSSProperties}
+                    />
+                    <span className="text-[10px] text-gray-400">px</span>
+                  </div>
+                </div>
+                <div
+                  className="relative pt-1 max-w-sm"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <input
+                    ref={fontSliderRef}
+                    type="range"
+                    min="11"
+                    max="17"
                     step="1"
-                    value={fontSizeScale}
-                    onChange={(e) => setFontSizeScale(parseInt(e.target.value))}
-                    className="w-full accent-blue-500 cursor-ew-resize h-1.5 rounded-lg appearance-none transition-all duration-100"
+                    tabIndex={0}
+                    value={sliderDisplayValue}
+                    onChange={(e) => {
+                      // Only update the visual thumb — no DOM font change during drag
+                      setSliderDisplayValue(parseInt(e.target.value));
+                    }}
+                    onMouseUp={() => {
+                      // Commit on release (discrete jump)
+                      setFontSizeScale(sliderDisplayValue);
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      let next: number | null = null;
+                      if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                        e.preventDefault();
+                        next = Math.max(11, sliderDisplayValue - 1);
+                      } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                        e.preventDefault();
+                        next = Math.min(17, sliderDisplayValue + 1);
+                      }
+                      if (next !== null) {
+                        // Update display immediately — zero relayout, focus is never lost
+                        setSliderDisplayValue(next);
+                        // Commit the actual font size 200ms after the last keypress
+                        // This way focus stays on the slider throughout rapid navigation
+                        if (fontCommitTimerRef.current) clearTimeout(fontCommitTimerRef.current);
+                        const captured = next;
+                        fontCommitTimerRef.current = setTimeout(() => {
+                          setFontSizeScale(captured);
+                          fontCommitTimerRef.current = null;
+                        }, 200);
+                      }
+                    }}
+                    className="w-full h-1.5 rounded-lg appearance-none"
                     style={{
-                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((fontSizeScale - 11) / (17 - 11)) * 100}%, ${isDarkMode ? '#27272a' : '#e5e7eb'} ${((fontSizeScale - 11) / (17 - 11)) * 100}%, ${isDarkMode ? '#27272a' : '#e5e7eb'} 100%)`
+                      cursor: "default",
+                      outline: "none",
+                      accentColor: "#3b82f6",
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((sliderDisplayValue - 11) / (17 - 11)) * 100}%, ${isDarkMode ? '#27272a' : '#e5e7eb'} ${((sliderDisplayValue - 11) / (17 - 11)) * 100}%, ${isDarkMode ? '#27272a' : '#e5e7eb'} 100%)`
                     }}
                   />
-                  <div className="flex justify-between px-1.5 mt-1 text-[7px] text-gray-400 dark:text-zinc-500 font-mono select-none font-bold">
-                    <span>|</span>
-                    <span>|</span>
-                    <span>|</span>
-                    <span className="relative">
-                      |
-                      <span className="absolute left-1/2 -translate-x-1/2 top-2 text-[10px] text-gray-400 dark:text-zinc-500 select-none">•</span>
-                    </span>
-                    <span>|</span>
-                    <span>|</span>
-                    <span>|</span>
+                  <div className="flex justify-between px-0.5 mt-1.5 select-none">
+                    {[11,12,13,14,15,16,17].map(v => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => {
+                          setSliderDisplayValue(v); // keep thumb in sync
+                          setFontSizeScale(v);
+                        }}
+                        className={`flex flex-col items-center gap-0.5 cursor-pointer transition-colors ${
+                          v === fontSizeScale ? "text-blue-500" : "text-gray-300 dark:text-zinc-700 hover:text-gray-400"
+                        }`}
+                      >
+                        <div className={`w-px h-1.5 rounded-full ${v === fontSizeScale ? "bg-blue-500" : "bg-current"}`} />
+                        {v === 14 && <span className="text-[7px] font-bold">Default</span>}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Menu Bar Layout style custom dropdown */}
+              {/* Menu Bar Layout style */}
               <div className="flex justify-between items-center pb-2">
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-gray-600 dark:text-zinc-300">Menu Bar Icon</span>
+                  <span className="text-[10px] text-gray-400 mt-0.5">Controls what shows in the top navigation bar</span>
                 </div>
                 <div className="relative">
                   <button
@@ -1722,11 +1827,11 @@ export default function App() {
                   {showMenuBarIconDropdown && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowMenuBarIconDropdown(false)} />
-                      <div className="absolute right-0 mt-1 w-32 rounded-lg border bg-white dark:bg-zinc-900 shadow-xl py-1 z-50 text-[11px] font-semibold text-gray-700 dark:text-zinc-300 border-gray-200 dark:border-zinc-800">
+                      <div className="absolute right-0 bottom-full mb-1 w-36 rounded-lg border bg-white dark:bg-zinc-900 shadow-xl py-1 z-[200] text-[11px] font-semibold text-gray-700 dark:text-zinc-300 border-gray-200 dark:border-zinc-800">
                         {[
-                          { value: "full", label: "Full" },
-                          { value: "icon", label: "Icon only" },
-                          { value: "hidden", label: "Hidden" }
+                          { value: "icon", label: "Icon only", desc: "Show icon" },
+                          { value: "full", label: "Full", desc: "Icon + label" },
+                          { value: "hidden", label: "Hidden", desc: "No bar item" }
                         ].map(opt => {
                           const isSelected = menuBarIconStyle === opt.value;
                           return (
@@ -1936,18 +2041,19 @@ export default function App() {
               <div 
                 ref={mapWrapperRef}
                 style={{ height: `${mapHeight}px` }}
-                className="p-4 rounded-xl border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-955/30 flex flex-col gap-2 overflow-hidden relative transition-all duration-75"
+                className={`p-4 rounded-xl border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-955/30 flex flex-col gap-2 overflow-hidden relative ${isMapResizing ? "" : "transition-all duration-75"}`}
               >
                 <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1 flex-shrink-0">Real-time Routing Coordinator Map</div>
-                <div className="flex-1 flex justify-between items-center relative py-2 px-4 select-none">
+                <div className="flex-1 flex justify-between items-center relative py-2 px-4 select-none map-flex-row">
                   {/* Category Circles (Left side) */}
-                  <div className="flex flex-col gap-3 z-10 w-28">
+                  <div className="flex flex-col gap-3 w-28" style={{ zIndex: 2, position: "relative" }}>
                     {ingestionCategories.map((cat) => {
                       const count = ingestionConnections.filter(c => c.category === cat).length;
                       return (
                         <div 
-                          key={cat} 
-                          className="category-box-node flex items-center gap-2 p-1 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 shadow-2xs cursor-pointer transition-all hover:border-emerald-500/50"
+                          key={cat}
+                          data-category={cat}
+                          className="category-box-node group/catnode flex items-center gap-2 p-1 px-2 rounded-lg bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 shadow-2xs cursor-pointer transition-all hover:border-emerald-500/50"
                           onMouseEnter={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
                             const parentRect = mapWrapperRef.current?.getBoundingClientRect();
@@ -1961,18 +2067,40 @@ export default function App() {
                           }}
                           onMouseLeave={() => setHoveredCategory(null)}
                         >
-                          <div className={`w-2 h-2 fill-current rounded-full ${count > 0 ? "bg-emerald-500 animate-pulse" : "bg-gray-300 dark:bg-zinc-700"}`} />
-                          <div className="flex flex-col min-w-0">
+                          <div className={`w-2 h-2 fill-current rounded-full flex-shrink-0 ${count > 0 ? "bg-emerald-500 animate-pulse" : "bg-gray-300 dark:bg-zinc-700"}`} />
+                          <div className="flex flex-col min-w-0 flex-1">
                             <span className="text-[9px] font-bold truncate leading-none text-gray-800 dark:text-zinc-200">{cat}</span>
                             <span className="text-[7px] text-gray-450 leading-none mt-1">{count} Active</span>
                           </div>
+                          <button
+                            type="button"
+                            title={`Remove ${cat} category`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIngestionCategories(prev => prev.filter(c => c !== cat));
+                              setIngestionConnections(prev => prev.filter(c => c.category !== cat));
+                              if (newConnCategory === cat) {
+                                setNewConnCategory(ingestionCategories.find(c => c !== cat) || "Market Data");
+                              }
+                            }}
+                            className="w-3.5 h-3.5 flex items-center justify-center text-gray-350 dark:text-zinc-600 hover:text-rose-500 dark:hover:text-rose-500 flex-shrink-0 rounded transition-colors"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                          </button>
                         </div>
                       );
                     })}
                   </div>
                   
                   {/* Router Box (Center) */}
-                  <div className="ingestion-router-box flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 z-10 w-36 shadow-lg">
+                  <div
+                    className="ingestion-router-box flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-500/30 w-36 shadow-lg"
+                    style={{ zIndex: 2, position: "relative", backgroundColor: "#f0fdf9" }}
+                  >
+                    <style>{`.dark .ingestion-router-box { background-color: #0d1f1a !important; }`}</style>
                     <Sparkles className="w-5 h-5 text-emerald-500 animate-spin mb-1" style={{ animationDuration: "12s" }} />
                     {isEditingRouterName ? (
                       <input 
@@ -1997,7 +2125,11 @@ export default function App() {
                   </div>
 
                   {/* Portfolio Engine (Right side) */}
-                  <div className="local-portfolio-box flex flex-col items-center justify-center p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-gray-250 dark:border-zinc-800 z-10 w-28 shadow-sm">
+                  <div
+                    className="local-portfolio-box flex flex-col items-center justify-center p-2.5 rounded-xl border border-gray-250 dark:border-zinc-800 w-28 shadow-sm"
+                    style={{ zIndex: 2, position: "relative", backgroundColor: "white" }}
+                  >
+                    <style>{`.dark .local-portfolio-box { background-color: #18181b !important; }`}</style>
                     <FolderHeart className="w-4 h-4 text-rose-500 animate-pulse mb-1" />
                     {isEditingPortfolioName ? (
                       <input 
@@ -2021,26 +2153,45 @@ export default function App() {
                     <span className="text-[7px] text-gray-400">Core Engine</span>
                   </div>
 
-                  {/* SVG Flow Lines Behind (absolute position) */}
-                  <div className="absolute inset-0 pointer-events-none z-0">
-                    <svg className="w-full h-full opacity-35 dark:opacity-25" xmlns="http://www.w3.org/2000/svg">
+                  {/* SVG Flow Lines — rendered BEHIND boxes using negative z-index */}
+                  <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+                    <svg className="w-full h-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        {/* Clip: don't draw inside the router box */}
+                      </defs>
                       {svgPaths.connections.map((conn, idx) => (
                         <g key={idx}>
-                          <path d={conn.d} stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                          <circle r="3.5" fill="#10b981" className="flow-dot-pulse">
-                            <animateMotion 
-                              path={conn.d} 
-                              dur="2.5s" 
-                              repeatCount="indefinite" 
-                              begin={conn.dotStyle.animationDelay as string} 
-                            />
-                          </circle>
+                          <path 
+                            d={conn.d} 
+                            stroke={conn.active ? "#10b981" : "#6b7280"} 
+                            strokeWidth="1.5" 
+                            strokeDasharray={conn.active ? "4,3" : "3,4"} 
+                            strokeOpacity={conn.active ? 0.55 : 0.25}
+                            fill="none" 
+                          />
+                          {conn.active && (
+                            <circle r="3.5" fill="#10b981" opacity="0.85" className="flow-dot-pulse">
+                              <animateMotion 
+                                path={conn.d} 
+                                dur="2.5s" 
+                                repeatCount="indefinite" 
+                                begin={conn.dotStyle.animationDelay as string} 
+                              />
+                            </circle>
+                          )}
                         </g>
                       ))}
                       {svgPaths.routerToPortfolio && (
                         <g>
-                          <path d={svgPaths.routerToPortfolio.d} stroke="#10b981" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-                          <circle r="3.5" fill="#10b981" className="flow-dot-pulse">
+                          <path 
+                            d={svgPaths.routerToPortfolio.d} 
+                            stroke="#10b981" 
+                            strokeWidth="1.5" 
+                            strokeDasharray="4,3" 
+                            strokeOpacity="0.55"
+                            fill="none" 
+                          />
+                          <circle r="3.5" fill="#10b981" opacity="0.85" className="flow-dot-pulse">
                             <animateMotion 
                               path={svgPaths.routerToPortfolio.d} 
                               dur="2.5s" 
@@ -2152,7 +2303,7 @@ export default function App() {
                             setIngestionConnections(prev => prev.filter(c => c.id !== conn.id));
                             playNaviAlert("listen");
                           }}
-                          className="p-1 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-500/5 cursor-pointer transition-colors"
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-colors border border-transparent hover:border-rose-500/20"
                           title="Delete connection"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -2183,7 +2334,7 @@ export default function App() {
               setNewConnKey("");
               playNaviAlert("hello");
               alert(`Successfully registered ${newConnName} API connection!`);
-            }} className="p-4 rounded-xl border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/50 dark:bg-zinc-950/20 space-y-3 max-w-xl">
+            }} className="p-4 rounded-xl border border-gray-250 dark:border-zinc-800 bg-[#fafafa]/50 dark:bg-zinc-950/20 space-y-3">
               <div className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-1">Add Router Connection</div>
               
               <div className="grid grid-cols-4 gap-3">
@@ -3828,15 +3979,44 @@ export default function App() {
           >
             {/* Left Sidebar inside preferences modal */}
             <div 
-              onMouseDown={handleModalDragStart}
-              className="w-[240px] bg-gray-50 dark:bg-[#121214] border-r border-gray-200 dark:border-[#27272a] flex flex-col p-4 select-none text-xs cursor-grab active:cursor-grabbing"
+              style={{ width: isSettingsSidebarCollapsed ? "52px" : `${settingsSidebarWidth}px`, minWidth: isSettingsSidebarCollapsed ? "52px" : "160px" }}
+              className="bg-gray-50 dark:bg-[#121214] border-r border-gray-200 dark:border-[#27272a] flex flex-col select-none text-xs relative flex-shrink-0"
             >
+              {/* Collapse toggle button */}
+              <button
+                type="button"
+                onClick={() => setIsSettingsSidebarCollapsed(prev => !prev)}
+                title={isSettingsSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 flex items-center justify-center shadow-sm hover:bg-gray-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-gray-500">
+                  {isSettingsSidebarCollapsed 
+                    ? <><polyline points="9 18 15 12 9 6"></polyline></>
+                    : <><polyline points="15 18 9 12 15 6"></polyline></>
+                  }
+                </svg>
+              </button>
+              {/* Resize drag handle — 4px hit zone at the very right edge, only when expanded */}
+              {!isSettingsSidebarCollapsed && (
+                <div
+                  onMouseDown={handleSettingsSidebarDragStart}
+                  className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize z-30 group/rhandle"
+                  style={{ cursor: "col-resize" }}
+                >
+                  <div className="absolute inset-0 hover:bg-emerald-500/30 active:bg-emerald-500/50 transition-colors" />
+                </div>
+              )}
+              <div
+                onMouseDown={handleModalDragStart}
+                className={`flex flex-col flex-1 overflow-hidden cursor-grab active:cursor-grabbing ${isSettingsSidebarCollapsed ? "p-2 pt-4 items-center" : "p-4 pr-3"}`}
+              >
               {/* macOS Traffic Lights top-left */}
-              <div className="flex gap-2 mb-5 items-center group/lights">
+              <div className={`flex gap-2 mb-5 items-center group/lights flex-shrink-0 ${isSettingsSidebarCollapsed ? "justify-center" : ""}`}>
                 <button 
                   type="button"
                   onClick={() => { setShowPreferencesModal(false); setIsModalMaximized(false); setModalOffset({ x: 0, y: 0 }); }} 
-                  className="w-3.2 h-3.2 rounded-full bg-[#ff5f56] flex items-center justify-center border border-[#e0443e] cursor-pointer relative transition-all"
+                  style={{ width: "12px", height: "12px", flexShrink: 0 }}
+                  className="rounded-full bg-[#ff5f56] flex items-center justify-center border border-[#e0443e] cursor-pointer relative transition-all"
                   title="Close Settings (Escape)"
                 >
                   <svg className="w-1.5 h-1.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#4c0002]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
@@ -3844,41 +4024,49 @@ export default function App() {
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
                 </button>
-                <button 
-                  type="button"
-                  onClick={() => setIsModalMinimized(true)}
-                  className="w-3.2 h-3.2 rounded-full bg-[#ffbd2e] flex items-center justify-center border border-[#dca124] cursor-pointer relative transition-all"
-                  title="Minimize Settings"
-                >
-                  <svg className="w-2 h-0.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#5c3e00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => { setIsModalMaximized(prev => !prev); if (!isModalMaximized) setModalOffset({ x: 0, y: 0 }); }}
-                  className="w-3.2 h-3.2 rounded-full bg-[#27c93f] flex items-center justify-center border border-[#1a9c2b] cursor-pointer relative transition-all"
-                  title={isModalMaximized ? "Restore Window Size" : "Maximize Settings"}
-                >
-                  <svg className="w-1.5 h-1.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#003300]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 3 21 3 21 9"></polyline>
-                    <polyline points="9 21 3 21 3 15"></polyline>
-                    <line x1="21" y1="3" x2="3" y2="21"></line>
-                  </svg>
-                </button>
+                {!isSettingsSidebarCollapsed && (
+                  <>
+                    <button 
+                      type="button"
+                      onClick={() => setIsModalMinimized(true)}
+                      style={{ width: "12px", height: "12px" }}
+                      className="rounded-full bg-[#ffbd2e] flex items-center justify-center border border-[#dca124] cursor-pointer relative transition-all"
+                      title="Minimize Settings"
+                    >
+                      <svg className="w-2 h-0.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#5c3e00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { setIsModalMaximized(prev => !prev); if (!isModalMaximized) setModalOffset({ x: 0, y: 0 }); }}
+                      style={{ width: "12px", height: "12px" }}
+                      className="rounded-full bg-[#27c93f] flex items-center justify-center border border-[#1a9c2b] cursor-pointer relative transition-all"
+                      title={isModalMaximized ? "Restore Window Size" : "Maximize Settings"}
+                    >
+                      <svg className="w-1.5 h-1.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#003300]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <polyline points="9 21 3 21 3 15"></polyline>
+                        <line x1="21" y1="3" x2="3" y2="21"></line>
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
               
-              {/* Search input box */}
-              <div className="mb-4 relative">
-                <input 
-                  type="text" 
-                  placeholder="Search..."
-                  value={settingsSearchQuery}
-                  onChange={(e) => setSettingsSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
-              </div>
+              {/* Search input box — hidden when collapsed */}
+              {!isSettingsSidebarCollapsed && (
+                <div className="mb-4 relative">
+                  <input 
+                    type="text" 
+                    placeholder="Search..."
+                    value={settingsSearchQuery}
+                    onChange={(e) => setSettingsSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                </div>
+              )}
               
               {/* Navigation list */}
               <div className="flex-1 overflow-y-auto space-y-1 pr-1">
@@ -3988,6 +4176,30 @@ export default function App() {
                   };
 
                   const filtered = filterTree(navigationTree);
+
+                  // Collapsed icon-only mode
+                  if (isSettingsSidebarCollapsed) {
+                    return navigationTree.map(node => {
+                      const IconComp = node.icon;
+                      const isActive = preferencesActiveSection === node.id || 
+                        (node.children && node.children.some((c: any) => c.id === preferencesActiveSection || preferencesActiveSection.startsWith(`ai_config_`) || preferencesActiveSection.startsWith(`ai_model_`)));
+                      return (
+                        <button
+                          key={node.id}
+                          type="button"
+                          onClick={() => handleParentClick(node)}
+                          title={node.label}
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
+                            isActive 
+                              ? "bg-gray-200/80 dark:bg-zinc-800 text-gray-900 dark:text-white" 
+                              : "hover:bg-gray-100 dark:hover:bg-zinc-800/50 text-gray-400 dark:text-zinc-500"
+                          }`}
+                        >
+                          <IconComp className="w-4 h-4" />
+                        </button>
+                      );
+                    });
+                  }
 
                   if (filtered.length === 0) {
                     return (
@@ -4116,6 +4328,7 @@ export default function App() {
                     );
                   });
                 })()}
+              </div>
               </div>
             </div>
             
