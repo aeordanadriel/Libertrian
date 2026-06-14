@@ -359,10 +359,21 @@ export default function App() {
   const [modalOffset, setModalOffset] = useState({ x: 0, y: 0 });
   const [isModalMaximized, setIsModalMaximized] = useState(false);
   const [isModalMinimized, setIsModalMinimized] = useState(false);
+  const [isSettingsDockedToSidebar, setIsSettingsDockedToSidebar] = useState(false);
+  const [preferencesModalWidth, setPreferencesModalWidth] = useState(850);
+  const [preferencesModalHeight, setPreferencesModalHeight] = useState(550);
+  
   const modalOffsetRef = useRef({ x: 0, y: 0 });
   const isDraggingModal = useRef(false);
   const dragModalStart = useRef({ x: 0, y: 0 });
   const dragModalOffset = useRef({ x: 0, y: 0 });
+
+  const isDraggingModalResize = useRef(false);
+  const dragResizeMode = useRef<"width" | "height" | "both">("both");
+  const dragStartResizeWidth = useRef(0);
+  const dragStartResizeHeight = useRef(0);
+  const dragStartResizeX = useRef(0);
+  const dragStartResizeY = useRef(0);
 
   // Ingestions states for Developer Ingestions Router
   interface IngestionConnection {
@@ -641,6 +652,18 @@ export default function App() {
         modalOffsetRef.current = newPos;
         setModalOffset(newPos);
       }
+      if (isDraggingModalResize.current) {
+        const dx = e.clientX - dragStartResizeX.current;
+        const dy = e.clientY - dragStartResizeY.current;
+        if (dragResizeMode.current === "both" || dragResizeMode.current === "width") {
+          const newW = Math.min(1400, Math.max(500, dragStartResizeWidth.current + dx));
+          setPreferencesModalWidth(newW);
+        }
+        if (dragResizeMode.current === "both" || dragResizeMode.current === "height") {
+          const newH = Math.min(900, Math.max(380, dragStartResizeHeight.current + dy));
+          setPreferencesModalHeight(newH);
+        }
+      }
       if (isDraggingMapHeight.current) {
         const delta = e.clientY - dragStartMapY.current;
         const newH = Math.min(450, Math.max(160, dragStartMapHeight.current + delta));
@@ -670,6 +693,9 @@ export default function App() {
       if (isDraggingModal.current) {
         isDraggingModal.current = false;
         dragModalOffset.current = { x: modalOffsetRef.current.x, y: modalOffsetRef.current.y };
+      }
+      if (isDraggingModalResize.current) {
+        isDraggingModalResize.current = false;
       }
     };
     window.addEventListener("mousemove", onMove);
@@ -813,6 +839,19 @@ export default function App() {
     dragModalStart.current = { x: e.clientX, y: e.clientY };
     dragModalOffset.current = { x: modalOffsetRef.current.x, y: modalOffsetRef.current.y };
     document.body.style.userSelect = "none";
+  };
+
+  const handleModalResizeStart = (e: React.MouseEvent, mode: "width" | "height" | "both") => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingModalResize.current = true;
+    dragResizeMode.current = mode;
+    dragStartResizeWidth.current = preferencesModalWidth;
+    dragStartResizeHeight.current = preferencesModalHeight;
+    dragStartResizeX.current = e.clientX;
+    dragStartResizeY.current = e.clientY;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = mode === "width" ? "col-resize" : mode === "height" ? "row-resize" : "se-resize";
   };
 
   const handlePasswordLogin = () => {
@@ -2691,8 +2730,9 @@ export default function App() {
                     key={tab.label}
                     onClick={() => {
                       if (tab.label === "Settings") {
-                        setPreferencesActiveSection("general");
+                        setPreferencesActiveSection("general_basic");
                         setShowPreferencesModal(true);
+                        setIsSettingsDockedToSidebar(false);
                       } else {
                         setActiveTab(idx);
                       }
@@ -2724,6 +2764,28 @@ export default function App() {
 
           {/* Bottom controls: dark mode toggle + profile */}
           <div className={`flex flex-col gap-3 w-full ${menuBarIconStyle === "full" ? "px-3 items-start" : "items-center"}`}>
+            {/* Docked Settings Icon (Only when settings is open but docked/minimized to sidebar) */}
+            {showPreferencesModal && isSettingsDockedToSidebar && (
+              <button
+                onClick={() => setIsSettingsDockedToSidebar(false)}
+                title="Restore Settings"
+                className={`rounded-full flex items-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 transition-all cursor-pointer group relative border border-emerald-500/25 ${
+                  menuBarIconStyle === "full" ? "w-full py-2 px-1.5 gap-3" : "w-10 h-10 justify-center"
+                }`}
+              >
+                <Settings className="w-5 h-5 flex-shrink-0 animate-spin" style={{ animationDuration: "12s" }} />
+                {menuBarIconStyle === "full" ? (
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                    Settings (Active)
+                  </span>
+                ) : (
+                  <span className="absolute left-14 bg-zinc-900 text-emerald-400 text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap font-bold">
+                    Settings (Active)
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Dark / Light Mode Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
@@ -3955,27 +4017,31 @@ export default function App() {
       {showPreferencesModal && (
         <div 
           className={`fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] font-sans transition-opacity duration-300 ${
-            isModalMinimized ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+            (isModalMinimized || isSettingsDockedToSidebar) ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
           }`}
         >
-          {/* Overlay click to dismiss */}
-          <div className="absolute inset-0" onClick={() => { setShowPreferencesModal(false); setIsModalMaximized(false); setModalOffset({ x: 0, y: 0 }); }} />
+          {/* Overlay click to dock to sidebar */}
+          <div className="absolute inset-0" onClick={() => setIsSettingsDockedToSidebar(true)} />
           
           <div 
             style={{ 
               transform: isModalMinimized 
                 ? "translate(35vw, 35vh) scale(0.05)" 
-                : isModalMaximized 
-                  ? "none" 
-                  : `translate(${modalOffset.x}px, ${modalOffset.y}px)`,
-              transition: isDraggingModal.current ? "none" : "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)"
+                : isSettingsDockedToSidebar
+                  ? "translate(-45vw, 35vh) scale(0.05)"
+                  : isModalMaximized 
+                    ? "none" 
+                    : `translate(${modalOffset.x}px, ${modalOffset.y}px)`,
+              width: isModalMaximized ? "100%" : `${preferencesModalWidth}px`,
+              height: isModalMaximized ? "100%" : `${preferencesModalHeight}px`,
+              transition: (isDraggingModal.current || isDraggingModalResize.current) ? "none" : "all 0.35s cubic-bezier(0.25, 1, 0.5, 1)"
             }}
-            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 transition-all duration-300 resize overflow-auto ${
-              isModalMinimized
+            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 transition-all duration-300 relative ${
+              (isModalMinimized || isSettingsDockedToSidebar)
                 ? "opacity-0 pointer-events-none"
                 : isModalMaximized 
-                  ? "w-full h-full rounded-none border-none resize-none" 
-                  : "w-[90vw] max-w-[1000px] h-[85vh] max-h-[720px] min-w-[400px] min-h-[300px] border border-gray-300 dark:border-[#27272a] rounded-xl"
+                  ? "w-full h-full rounded-none border-none" 
+                  : "border border-gray-300 dark:border-[#27272a] rounded-xl"
             }`}
           >
             {/* Left Sidebar inside preferences modal */}
@@ -4015,7 +4081,7 @@ export default function App() {
               <div className={`flex gap-2 mb-5 items-center group/lights flex-shrink-0 ${isSettingsSidebarCollapsed ? "justify-center" : ""}`}>
                 <button 
                   type="button"
-                  onClick={() => { setShowPreferencesModal(false); setIsModalMaximized(false); setModalOffset({ x: 0, y: 0 }); }} 
+                  onClick={() => { setShowPreferencesModal(false); setIsModalMaximized(false); setIsSettingsDockedToSidebar(false); setModalOffset({ x: 0, y: 0 }); }} 
                   style={{ width: "12px", height: "12px", flexShrink: 0 }}
                   className="rounded-full bg-[#ff5f56] flex items-center justify-center border border-[#e0443e] cursor-pointer relative transition-all"
                   title="Close Settings (Escape)"
@@ -4337,6 +4403,30 @@ export default function App() {
             <div className="flex-1 flex flex-col overflow-y-auto p-6 bg-white dark:bg-[#18181b]">
               {renderPreferencesContent()}
             </div>
+
+            {/* Custom Resizing Edge & Corner Handles */}
+            {!isModalMaximized && (
+              <>
+                {/* Right Edge handle */}
+                <div 
+                  onMouseDown={(e) => handleModalResizeStart(e, "width")}
+                  className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[1000] hover:bg-emerald-500/20 active:bg-emerald-500/40 transition-colors"
+                  title="Drag to resize width"
+                />
+                {/* Bottom Edge handle */}
+                <div 
+                  onMouseDown={(e) => handleModalResizeStart(e, "height")}
+                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize z-[1000] hover:bg-emerald-500/20 active:bg-emerald-500/40 transition-colors"
+                  title="Drag to resize height"
+                />
+                {/* Bottom-right Corner handle */}
+                <div 
+                  onMouseDown={(e) => handleModalResizeStart(e, "both")}
+                  className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-[1001] bg-transparent"
+                  title="Drag to resize window"
+                />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -4345,11 +4435,10 @@ export default function App() {
       {showPreferencesModal && isModalMinimized && (
         <button 
           onClick={() => setIsModalMinimized(false)}
-          className="fixed bottom-4 right-4 z-[120] p-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-2xl flex items-center gap-2 border border-emerald-400 cursor-pointer transition-all animate-bounce"
-          title="Restore Preferences Window"
+          className="fixed bottom-4 right-4 z-[120] w-12 h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center border border-emerald-400 cursor-pointer transition-all animate-bounce"
+          title="Restore Settings"
         >
-          <Settings className="w-5 h-5 animate-spin" style={{ animationDuration: "6s" }} />
-          <span className="text-xs font-extrabold tracking-wide pr-1">Restore Settings</span>
+          <Settings className="w-5 h-5 animate-spin flex-shrink-0" style={{ animationDuration: "6s" }} />
         </button>
       )}
 
