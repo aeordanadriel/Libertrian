@@ -362,6 +362,9 @@ export default function App() {
   const [isSettingsDockedToSidebar, setIsSettingsDockedToSidebar] = useState(false);
   const [preferencesModalWidth, setPreferencesModalWidth] = useState(850);
   const [preferencesModalHeight, setPreferencesModalHeight] = useState(550);
+  // State booleans to trigger re-renders (refs alone won't re-render)
+  const [isModalBeingDragged, setIsModalBeingDragged] = useState(false);
+  const [isModalBeingResized, setIsModalBeingResized] = useState(false);
   
   const modalOffsetRef = useRef({ x: 0, y: 0 });
   const isDraggingModal = useRef(false);
@@ -692,10 +695,12 @@ export default function App() {
       setIsDraggingRight(false);
       if (isDraggingModal.current) {
         isDraggingModal.current = false;
+        setIsModalBeingDragged(false);
         dragModalOffset.current = { x: modalOffsetRef.current.x, y: modalOffsetRef.current.y };
       }
       if (isDraggingModalResize.current) {
         isDraggingModalResize.current = false;
+        setIsModalBeingResized(false);
       }
     };
     window.addEventListener("mousemove", onMove);
@@ -836,6 +841,7 @@ export default function App() {
       return;
     }
     isDraggingModal.current = true;
+    setIsModalBeingDragged(true);
     dragModalStart.current = { x: e.clientX, y: e.clientY };
     dragModalOffset.current = { x: modalOffsetRef.current.x, y: modalOffsetRef.current.y };
     document.body.style.userSelect = "none";
@@ -845,6 +851,7 @@ export default function App() {
     e.preventDefault();
     e.stopPropagation();
     isDraggingModalResize.current = true;
+    setIsModalBeingResized(true);
     dragResizeMode.current = mode;
     dragStartResizeWidth.current = preferencesModalWidth;
     dragStartResizeHeight.current = preferencesModalHeight;
@@ -4020,8 +4027,8 @@ export default function App() {
             (isModalMinimized || isSettingsDockedToSidebar) ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
           }`}
         >
-          {/* Overlay click to dock to sidebar */}
-          <div className="absolute inset-0" onClick={() => setIsSettingsDockedToSidebar(true)} />
+          {/* Overlay click to dock to sidebar — sits behind modal */}
+          <div className="absolute inset-0 z-0" onClick={() => setIsSettingsDockedToSidebar(true)} />
           
           <div 
             style={{ 
@@ -4034,9 +4041,9 @@ export default function App() {
                     : `translate(${modalOffset.x}px, ${modalOffset.y}px)`,
               width: isModalMaximized ? "100%" : `${preferencesModalWidth}px`,
               height: isModalMaximized ? "100%" : `${preferencesModalHeight}px`,
-              transition: (isDraggingModal.current || isDraggingModalResize.current) ? "none" : "all 0.35s cubic-bezier(0.25, 1, 0.5, 1)"
+              transition: (isModalBeingDragged || isModalBeingResized) ? "none" : "transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), width 0.35s cubic-bezier(0.25, 1, 0.5, 1), height 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease"
             }}
-            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 transition-all duration-300 relative ${
+            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 relative ${
               (isModalMinimized || isSettingsDockedToSidebar)
                 ? "opacity-0 pointer-events-none"
                 : isModalMaximized 
