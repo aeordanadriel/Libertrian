@@ -317,6 +317,7 @@ export default function App() {
 
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [themeSearchQuery, setThemeSearchQuery] = useState("");
+  const [hoveredTooltip, setHoveredTooltip] = useState<{ text: string; rect: DOMRect } | null>(null);
   
   // Footer status bar state
   const [selectedSector, setSelectedSector] = useState<string>("Layer 1");
@@ -2971,7 +2972,14 @@ export default function App() {
                   onClick={() => {
                     setActiveAgentChatId(null);
                     setActiveTab(idx);
+                    setHoveredTooltip(null);
                   }}
+                  onMouseEnter={(e) => {
+                    if (menuBarIconStyle !== "full") {
+                      setHoveredTooltip({ text: tab.label, rect: e.currentTarget.getBoundingClientRect() });
+                    }
+                  }}
+                  onMouseLeave={() => setHoveredTooltip(null)}
                   className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
                     menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
                   }`}
@@ -2981,13 +2989,8 @@ export default function App() {
                   )}
                   <IconComponent className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive ? "text-emerald-500" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
                   
-                  {menuBarIconStyle === "full" ? (
+                  {menuBarIconStyle === "full" && (
                     <span className={`text-[11px] font-bold transition-colors ${isActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
-                      {tab.label}
-                    </span>
-                  ) : (
-                    /* Tooltip */
-                    <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
                       {tab.label}
                     </span>
                   )}
@@ -3008,22 +3011,24 @@ export default function App() {
                       key={agentId}
                       onClick={() => {
                         setActiveAgentChatId(agentId);
+                        setHoveredTooltip(null);
                       }}
+                      onMouseEnter={(e) => {
+                        if (menuBarIconStyle !== "full") {
+                          setHoveredTooltip({ text: `${agent.name} Workspace`, rect: e.currentTarget.getBoundingClientRect() });
+                        }
+                      }}
+                      onMouseLeave={() => setHoveredTooltip(null)}
                       className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
                         menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
                       }`}
-                      title={`${agent.name} Workspace`}
                     >
                       {isAgentActive && (
                         <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
                       )}
-                      <Bot className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "text-emerald-500 animate-pulse" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
-                      {menuBarIconStyle === "full" ? (
+                      <AgentMascot name={agent.name} className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "animate-pulse" : ""}`} />
+                      {menuBarIconStyle === "full" && (
                         <span className={`text-[11px] font-bold transition-colors ${isAgentActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
-                          {agent.name}
-                        </span>
-                      ) : (
-                        <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
                           {agent.name}
                         </span>
                       )}
@@ -3041,18 +3046,21 @@ export default function App() {
                 setPreferencesActiveSection("general_basic");
                 setShowPreferencesModal(true);
                 setIsSettingsDockedToSidebar(false);
+                setHoveredTooltip(null);
               }}
+              onMouseEnter={(e) => {
+                if (menuBarIconStyle !== "full") {
+                  setHoveredTooltip({ text: "Settings", rect: e.currentTarget.getBoundingClientRect() });
+                }
+              }}
+              onMouseLeave={() => setHoveredTooltip(null)}
               className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
                 menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
               }`}
             >
               <Settings className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white" />
-              {menuBarIconStyle === "full" ? (
+              {menuBarIconStyle === "full" && (
                 <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
-                  Settings
-                </span>
-              ) : (
-                <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
                   Settings
                 </span>
               )}
@@ -3060,23 +3068,27 @@ export default function App() {
           </nav>
 
           {/* Bottom controls: dark mode toggle + profile */}
-          <div className={`flex flex-col gap-3 w-full ${menuBarIconStyle === "full" ? "px-3 items-start" : "items-center"}`}>
+          <div className={`flex flex-col gap-3 w-full flex-shrink-0 ${menuBarIconStyle === "full" ? "px-3 items-start" : "items-center"}`}>
             {/* Docked Settings Icon (Only when settings is open but docked/minimized to sidebar) */}
             {showPreferencesModal && isSettingsDockedToSidebar && (
               <button
-                onClick={() => setIsSettingsDockedToSidebar(false)}
-                title="Restore Settings"
+                onClick={() => {
+                  setIsSettingsDockedToSidebar(false);
+                  setHoveredTooltip(null);
+                }}
+                onMouseEnter={(e) => {
+                  if (menuBarIconStyle !== "full") {
+                    setHoveredTooltip({ text: "Settings (Active)", rect: e.currentTarget.getBoundingClientRect() });
+                  }
+                }}
+                onMouseLeave={() => setHoveredTooltip(null)}
                 className={`rounded-full flex items-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 transition-all cursor-pointer group relative border border-emerald-500/25 ${
                   menuBarIconStyle === "full" ? "w-full py-2 px-1.5 gap-3" : "w-10 h-10 justify-center"
                 }`}
               >
                 <Settings className="w-5 h-5 flex-shrink-0 animate-spin" style={{ animationDuration: "12s" }} />
-                {menuBarIconStyle === "full" ? (
+                {menuBarIconStyle === "full" && (
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                    Settings (Active)
-                  </span>
-                ) : (
-                  <span className="absolute left-14 bg-zinc-900 text-emerald-400 text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap font-bold">
                     Settings (Active)
                   </span>
                 )}
@@ -3085,8 +3097,16 @@ export default function App() {
 
             {/* Dark / Light Mode Toggle */}
             <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              onClick={() => {
+                setIsDarkMode(!isDarkMode);
+                setHoveredTooltip(null);
+              }}
+              onMouseEnter={(e) => {
+                if (menuBarIconStyle !== "full") {
+                  setHoveredTooltip({ text: isDarkMode ? "Light Mode" : "Dark Mode", rect: e.currentTarget.getBoundingClientRect() });
+                }
+              }}
+              onMouseLeave={() => setHoveredTooltip(null)}
               className={`rounded-full flex items-center hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer group relative ${
                 menuBarIconStyle === "full" ? "w-full py-2 px-1.5 gap-3" : "w-10 h-10 justify-center"
               }`}
@@ -3095,12 +3115,8 @@ export default function App() {
                 ? <Sun className="w-5 h-5 text-amber-400 flex-shrink-0" />
                 : <Moon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
               }
-              {menuBarIconStyle === "full" ? (
+              {menuBarIconStyle === "full" && (
                 <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
-                  {isDarkMode ? "Light Mode" : "Dark Mode"}
-                </span>
-              ) : (
-                <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
                   {isDarkMode ? "Light Mode" : "Dark Mode"}
                 </span>
               )}
@@ -3111,11 +3127,19 @@ export default function App() {
 
             {/* Profile Badge */}
             <div 
-              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              onClick={() => {
+                setShowProfileDropdown(!showProfileDropdown);
+                setHoveredTooltip(null);
+              }}
+              onMouseEnter={(e) => {
+                if (menuBarIconStyle !== "full") {
+                  setHoveredTooltip({ text: "Profile & Settings", rect: e.currentTarget.getBoundingClientRect() });
+                }
+              }}
+              onMouseLeave={() => setHoveredTooltip(null)}
               className={`flex items-center cursor-pointer transition-all hover:opacity-90 ${
                 menuBarIconStyle === "full" ? "w-full py-2 px-1.5 gap-3" : "w-10 h-10 justify-center"
               }`}
-              title="Profile & Settings"
             >
               <OrangeMascot className={menuBarIconStyle === "full" ? "w-8 h-8 flex-shrink-0" : "w-9 h-9 flex-shrink-0"} />
               {menuBarIconStyle === "full" && (
@@ -4922,6 +4946,19 @@ export default function App() {
                 })}
             </div>
           </div>
+        </div>
+      )}
+      {hoveredTooltip && (
+        <div 
+          style={{ 
+            position: "fixed", 
+            left: `${hoveredTooltip.rect.right + 8}px`, 
+            top: `${hoveredTooltip.rect.top + (hoveredTooltip.rect.height / 2)}px`,
+            transform: "translateY(-50%)"
+          }}
+          className="z-[9999] bg-white text-zinc-900 border border-gray-250 dark:bg-zinc-950 dark:text-zinc-50 dark:border-zinc-800 text-[10.5px] font-bold px-2.5 py-1 rounded-md shadow-md pointer-events-none whitespace-nowrap font-sans transition-all duration-150"
+        >
+          {hoveredTooltip.text}
         </div>
       )}
     </div>

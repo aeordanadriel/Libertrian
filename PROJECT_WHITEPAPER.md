@@ -291,3 +291,22 @@ Implemented scrollable left sidebar navigation to handle large numbers of pinned
 - **Back Button:** Integrated a `<ChevronLeft>` back navigation button in `renderPinnedAgentWorkspace` header that sets `activeAgentChatId(null)` to exit 1-on-1 chat console.
 - **Orchestrator Mascot Face:** Created `OrchestratorMascot` (cyber-emerald theme) and integrated it in the Orchestrator Terminal header and message history templates.
 - **Dynamic Sub-Agent Mascots:** Created a parameterized `<AgentMascot name={agent.name} />` resolving background, face, and detail fills deterministically (pink, gold, indigo, teal, or blue). Applied it to deployed agents list cards, custom workspace header, and chat history bubbles.
+
+---
+
+## Entry 12 — Global Viewport-Fixed Tooltips & Sidebar Pinned Mascots
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 1.5 Pro | **Effort:** Medium
+
+### Summary
+Resolved sidebar tooltip clipping issues caused by scrollable container layout boxes using a single viewport-fixed portal, mapped all navigation buttons and control bars to trigger global tooltips on hover, ensured light/dark theme adaptation, and integrated dynamic mascot icons in the sidebar pinned agent navigation list.
+
+### Technical Details
+- **Viewport-Fixed Tooltip Portal:** Declared a global `hoveredTooltip` state variable (`{ text: string; rect: DOMRect } | null`) inside the main `App` component. Mounted a single fixed-position tooltip element at the root level of the render tree that uses `getBoundingClientRect()` values to place itself precisely beside the hovered sidebar item.
+- **Scroll Container Escape:** Bypassed layout box CSS overflow clipping (`overflow-y-auto`) by drawing the tooltip outside the scrollable sidebar container tree, preserving full layout fluidness.
+- **Theme-Adaptive Styling:** Configured tooltip colors to adapt to active light/dark modes (`bg-white border-gray-250 text-zinc-900` in light mode, and `bg-zinc-950 border-zinc-800 text-zinc-50` in dark mode).
+- **Pinned Agent Mascot Avatars:** Replaced generic `<Bot />` icons in the sidebar pinned list with the custom dynamic `<AgentMascot name={agent.name} />` SVG component, creating a high-fidelity visual alignment with the Agent Dashboard layout.
+
