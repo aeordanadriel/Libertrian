@@ -32,7 +32,8 @@ import {
   LogOut,
   Search,
   Landmark,
-  Trash2
+  Trash2,
+  Star
 } from "lucide-react";
 
 // Orange mascot avatar component
@@ -254,7 +255,8 @@ export default function App() {
   const [themeSearchQuery, setThemeSearchQuery] = useState("");
   
   // Footer status bar state
-  const [selectedSector, setSelectedSector] = useState<"Layer 1" | "Layer 2" | "Memes" | "DePIN">("Layer 1");
+  const [selectedSector, setSelectedSector] = useState<string>("Layer 1");
+  const [sectorsList, setSectorsList] = useState<string[]>(["Layer 1", "Layer 2", "Memes", "DePIN"]);
   const [selectedTimezone, setSelectedTimezone] = useState("Local");
   const [currentTime, setCurrentTime] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("Connected");
@@ -377,6 +379,151 @@ export default function App() {
   const dragStartResizeHeight = useRef(0);
   const dragStartResizeX = useRef(0);
   const dragStartResizeY = useRef(0);
+
+  const [pinnedAgentIds, setPinnedAgentIds] = useState<string[]>([]);
+  const [activeAgentChatId, setActiveAgentChatId] = useState<string | null>(null);
+
+  const getPreferencesSectionTitle = () => {
+    if (preferencesActiveSection === "account_details") return "Account Preferences";
+    if (preferencesActiveSection === "account_password") return "Password Settings";
+    if (preferencesActiveSection === "ai_general") return "AI Settings";
+    if (preferencesActiveSection === "ai_new_agent") return "Deploy New Agent";
+    if (preferencesActiveSection.startsWith("ai_config_")) {
+      const agentId = preferencesActiveSection.replace("ai_config_", "");
+      const agent = aiAgents.find(a => a.id === agentId);
+      return agent ? `${agent.name} Settings` : "Agent Settings";
+    }
+    if (preferencesActiveSection.startsWith("ai_model_")) {
+      const agentId = preferencesActiveSection.replace("ai_model_", "");
+      const agent = aiAgents.find(a => a.id === agentId);
+      return agent ? `${agent.name} Models` : "Agent Models";
+    }
+    if (preferencesActiveSection === "general_basic") return "General Settings";
+    if (preferencesActiveSection === "general_sound") return "Sound Settings";
+    if (preferencesActiveSection === "quotes") return "Quotes Settings";
+    if (preferencesActiveSection === "chart_main") return "Main Chart Settings";
+    if (preferencesActiveSection === "chart_extended") return "Extended Chart Settings";
+    if (preferencesActiveSection === "chart_intraday") return "Intraday Settings";
+    if (preferencesActiveSection === "chart_trade") return "Trade Settings";
+    if (preferencesActiveSection === "developer") return "Ingestions Router";
+    return "Preferences";
+  };
+
+  const renderPinnedAgentWorkspace = (agentId: string) => {
+    const agent = aiAgents.find(a => a.id === agentId);
+    if (!agent) return <div className="p-4 text-xs text-rose-500">Agent not found</div>;
+
+    return (
+      <div className="flex h-full w-full overflow-hidden p-4 gap-4 bg-white dark:bg-[#09090b] font-sans">
+        {/* Chat Console */}
+        <div className="flex-1 h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden">
+          {/* Header */}
+          <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
+            <div className="flex items-center gap-2">
+              <Bot className="w-4.5 h-4.5 text-emerald-500 animate-pulse" />
+              <span className="font-bold">{agent.name} Workspace</span>
+            </div>
+            <button
+              onClick={() => {
+                setPinnedAgentIds(prev => prev.filter(id => id !== agentId));
+                setActiveAgentChatId(null);
+              }}
+              className="text-[10px] font-bold text-gray-450 hover:text-rose-500 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Unpin Agent</span>
+            </button>
+          </span>
+
+          {/* Message History */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 text-xs">
+            {agent.chatHistory.map((msg, idx) => (
+              <div key={idx} className={`flex flex-col ${msg.sender === "user" ? "items-end" : "items-start"}`}>
+                <span className="text-[9px] text-gray-400 dark:text-zinc-500 font-bold mb-0.5">
+                  {msg.sender === "user" ? "You" : agent.name}
+                </span>
+                <div className={`px-3 py-2 rounded-lg max-w-[80%] leading-relaxed ${
+                  msg.sender === "user" 
+                    ? "bg-emerald-500 text-white font-semibold rounded-tr-none" 
+                    : "bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-800 dark:text-zinc-150 rounded-tl-none font-medium"
+                }`}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {isAgentTyping && (
+              <div className="flex flex-col items-start">
+                <span className="text-[9px] text-gray-400 dark:text-zinc-550 font-bold mb-0.5">{agent.name}</span>
+                <div className="px-3 py-2 rounded-lg bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-400 rounded-tl-none italic animate-pulse">
+                  typing...
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className="p-3 bg-gray-100 dark:bg-[#121214] border-t border-gray-200 dark:border-zinc-800 flex gap-2">
+            <input 
+              type="text" 
+              placeholder={`Send instruction to ${agent.name}...`}
+              value={agentChatInput}
+              onChange={(e) => setAgentChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSendAgentMessage(agentId); }}
+              className="flex-1 px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#09090b] focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => handleSendAgentMessage(agentId)}
+              className="p-2 bg-emerald-500 hover:bg-emerald-600 rounded-md text-white cursor-pointer transition-colors"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Sidebar Info Panel */}
+        <div className="w-[300px] h-full rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col p-4 overflow-hidden select-none">
+          <div className="border-b border-gray-200 dark:border-zinc-850 pb-3 mb-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Agent Details</h3>
+            <h2 className="text-base font-extrabold mt-1">{agent.name}</h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-4">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-gray-450 dark:text-zinc-500 uppercase">Model Endpoint</span>
+              <p className="text-xs font-semibold">{agent.aiProvider.toUpperCase()} ({agent.aiModel})</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-gray-450 dark:text-zinc-500 uppercase">Cron Schedule</span>
+              <p className="text-xs font-mono bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 px-2 py-1 rounded w-fit">{agent.cron}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-gray-450 dark:text-zinc-500 uppercase">System Instructions</span>
+              <p className="text-xs text-gray-500 dark:text-zinc-400 leading-relaxed bg-white dark:bg-[#09090b] border border-gray-250 dark:border-zinc-800 p-2.5 rounded-lg max-h-[220px] overflow-y-auto">
+                {agent.instructions}
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-200 dark:border-zinc-800 mt-auto">
+            <button
+              onClick={() => {
+                setPreferencesActiveSection(`ai_config_${agentId}`);
+                setShowPreferencesModal(true);
+                setIsSettingsDockedToSidebar(false);
+              }}
+              className="w-full py-2 bg-zinc-150 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-705 text-gray-800 dark:text-zinc-200 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Configure Agent</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Ingestions states for Developer Ingestions Router
   interface IngestionConnection {
@@ -1329,6 +1476,28 @@ export default function App() {
               className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold transition-colors flex items-center justify-center cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="border border-rose-500/20 rounded-lg p-3 bg-rose-500/[0.02] flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div>
+              <h4 className="text-xs font-bold text-rose-500">Danger Zone</h4>
+              <p className="text-[10px] text-gray-400 font-medium">Permanently delete this agent and all associated settings.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete ${agent.name}?`)) {
+                  setAiAgents(prev => prev.filter(a => a.id !== agentId));
+                  setPreferencesActiveSection("general_basic");
+                }
+              }}
+              className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+            >
+              Delete Agent
             </button>
           </div>
         </div>
@@ -2713,7 +2882,7 @@ export default function App() {
       <div className="flex flex-1 w-full overflow-hidden relative">
         
         {/* Left Sidebar Navigation */}
-        <aside className={`flex flex-col border-r py-4 justify-between select-none transition-all duration-200 ${sidebarWidthClass} ${tc.card} ${tc.border}`}>
+        <aside className={`flex flex-col border-r pt-4 pb-5 justify-between select-none transition-all duration-200 ${sidebarWidthClass} ${tc.card} ${tc.border}`}>
           <div className="flex flex-col items-center gap-6 w-full">
             {/* Logo */}
             <div className="w-8 h-8 flex items-center justify-center">
@@ -2727,22 +2896,16 @@ export default function App() {
                 { icon: TrendingUp, label: "Market" },
                 { icon: FolderHeart, label: "Portfolio" },
                 { icon: Clock, label: "Prep" },
-                { icon: Bot, label: "Analyst" },
-                { icon: Settings, label: "Settings" }
+                { icon: Bot, label: "Analyst" }
               ].map((tab, idx) => {
                 const IconComponent = tab.icon;
-                const isActive = activeTab === idx;
+                const isActive = activeTab === idx && !activeAgentChatId;
                 return (
                   <button
                     key={tab.label}
                     onClick={() => {
-                      if (tab.label === "Settings") {
-                        setPreferencesActiveSection("general_basic");
-                        setShowPreferencesModal(true);
-                        setIsSettingsDockedToSidebar(false);
-                      } else {
-                        setActiveTab(idx);
-                      }
+                      setActiveAgentChatId(null);
+                      setActiveTab(idx);
                     }}
                     className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
                       menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
@@ -2766,6 +2929,69 @@ export default function App() {
                   </button>
                 );
               })}
+
+              {/* Pinned Agents Section */}
+              {pinnedAgentIds.length > 0 && (
+                <>
+                  <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+                  {pinnedAgentIds.map(agentId => {
+                    const agent = aiAgents.find(a => a.id === agentId);
+                    if (!agent) return null;
+                    const isAgentActive = activeAgentChatId === agentId;
+                    return (
+                      <button
+                        key={agentId}
+                        onClick={() => {
+                          setActiveAgentChatId(agentId);
+                        }}
+                        className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
+                          menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
+                        }`}
+                        title={`${agent.name} Workspace`}
+                      >
+                        {isAgentActive && (
+                          <div className="absolute left-0 w-[3px] h-6 bg-emerald-500 rounded-r" />
+                        )}
+                        <Bot className={`w-5 h-5 flex-shrink-0 transition-colors ${isAgentActive ? "text-emerald-500 animate-pulse" : "text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`} />
+                        {menuBarIconStyle === "full" ? (
+                          <span className={`text-[11px] font-bold transition-colors ${isAgentActive ? "text-emerald-500 font-extrabold" : "text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white"}`}>
+                            {agent.name}
+                          </span>
+                        ) : (
+                          <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
+                            {agent.name}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Settings Tab */}
+              <div className="w-8 h-[1px] bg-gray-250 dark:bg-zinc-800/80 mx-auto my-1 flex-shrink-0" />
+              <button
+                onClick={() => {
+                  setActiveAgentChatId(null);
+                  setPreferencesActiveSection("general_basic");
+                  setShowPreferencesModal(true);
+                  setIsSettingsDockedToSidebar(false);
+                }}
+                className={`relative flex items-center rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors group cursor-pointer ${
+                  menuBarIconStyle === "full" ? "w-full px-3 py-2.5 gap-3" : "w-12 h-12 justify-center"
+                }`}
+              >
+                <Settings className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white" />
+                {menuBarIconStyle === "full" ? (
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-[#a1a1aa] group-hover:text-black dark:group-hover:text-white">
+                    Settings
+                  </span>
+                ) : (
+                  <span className="absolute left-14 scale-0 group-hover:scale-100 transition-all origin-left bg-zinc-900 text-white text-[10px] px-2 py-1 rounded shadow-md z-50 whitespace-nowrap">
+                    Settings
+                  </span>
+                )}
+              </button>
             </nav>
           </div>
 
@@ -2816,6 +3042,9 @@ export default function App() {
               )}
             </button>
 
+            {/* Centered Short Divider */}
+            <div className="w-8 h-[1px] bg-gray-200 dark:bg-zinc-800 mx-auto my-1 flex-shrink-0" />
+
             {/* Profile Badge */}
             <div 
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
@@ -2833,6 +3062,9 @@ export default function App() {
             </div>
           </div>
         </aside>
+
+        {/* Right side content and status bar container */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
 
         {/* Profile Dropdown Popover */}
         {showProfileDropdown && (
@@ -2963,8 +3195,11 @@ export default function App() {
         {/* Viewport Area */}
         <main className={`flex-1 h-full overflow-y-auto bg-white dark:bg-[#09090b] ${tc.bg}`}>
           
+          {/* Pinned Agent Chat Workspace */}
+          {activeAgentChatId && renderPinnedAgentWorkspace(activeAgentChatId)}
+          
           {/* Tab 0: Banking */}
-          {activeTab === 0 && (
+          {!activeAgentChatId && activeTab === 0 && (
             <div className="flex flex-col p-6 gap-6 max-w-6xl mx-auto w-full">
               <div>
                 <h1 className="text-2xl font-bold">Banking Dashboard</h1>
@@ -3058,7 +3293,7 @@ export default function App() {
           )}
 
           {/* Tab 1: Market Terminal */}
-          {activeTab === 1 && (
+          {!activeAgentChatId && activeTab === 1 && (
             <div className="flex h-full w-full overflow-hidden select-none">
 
               {/* ── LEFT PANEL: Watchlist (3-state collapsible) ── */}
@@ -3546,7 +3781,7 @@ export default function App() {
           )}
 
           {/* Tab 2: Crypto Portfolio */}
-          {activeTab === 2 && (
+          {!activeAgentChatId && activeTab === 2 && (
             <div className="flex flex-col p-6 gap-6 max-w-6xl mx-auto w-full">
               <div>
                 <h1 className="text-2xl font-bold">Crypto Portfolio</h1>
@@ -3652,7 +3887,7 @@ export default function App() {
           )}
 
           {/* Tab 3: Bull Run Prep */}
-          {activeTab === 3 && (
+          {!activeAgentChatId && activeTab === 3 && (
             <div className="flex flex-col p-6 gap-6 max-w-6xl mx-auto w-full">
               <div>
                 <h1 className="text-2xl font-bold">Bull Run Prep Planner</h1>
@@ -3794,74 +4029,153 @@ export default function App() {
           )}
 
           {/* Tab 4: AI Analyst */}
-          {activeTab === 4 && (
-            <div className="flex h-full w-full overflow-hidden p-4 gap-4">
-              {/* Chat Console */}
-              <div className="flex-1 h-full rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden">
-                <span className="font-bold text-sm p-4 border-b border-gray-200 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214]">Agent Terminal</span>
-                {/* Message Log */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((msg, idx) => {
-                    const isUser = msg.sender === "User";
-                    const isSystem = msg.sender === "System";
+          {!activeAgentChatId && activeTab === 4 && (
+            <div className="flex flex-col h-full w-full p-4 gap-4 overflow-hidden font-sans">
+              
+              {/* Horizontal Pinned Agent Dashboard Panel */}
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <span className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Deployed AI Agents</span>
+                <div className="flex gap-3.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-zinc-800">
+                  {aiAgents.map(agent => {
+                    const isPinned = pinnedAgentIds.includes(agent.id);
                     return (
-                      <div key={idx} className={`flex w-full ${isUser ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] p-3 rounded-lg border text-xs leading-relaxed ${isUser ? "bg-emerald-500/10 border-emerald-500 text-black dark:text-[#f4f4f5]" : isSystem ? "bg-zinc-100 dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-gray-400" : "bg-white dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-black dark:text-[#f4f4f5]"}`}>
-                          <div className="flex items-center gap-1.5 font-bold mb-1 border-b border-gray-100 dark:border-zinc-800 pb-0.5">
-                            <span className={isUser ? "text-emerald-500" : "text-gray-400"}>{msg.sender}</span>
+                      <div key={agent.id} className="min-w-[210px] max-w-[240px] p-3 rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50/50 dark:bg-zinc-950/20 flex flex-col justify-between flex-shrink-0 transition-shadow hover:shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 rounded bg-emerald-500/10 text-emerald-500 flex-shrink-0">
+                              <Bot className="w-4 h-4" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-bold truncate">{agent.name}</span>
+                              <span className="text-[9px] text-gray-400 font-semibold truncate">{agent.aiModel}</span>
+                            </div>
                           </div>
-                          <p className="whitespace-pre-line font-medium">{msg.text}</p>
+                          
+                          {/* Pin / Unpin Toggle */}
+                          <button
+                            onClick={() => {
+                              setPinnedAgentIds(prev => 
+                                prev.includes(agent.id) 
+                                  ? prev.filter(id => id !== agent.id) 
+                                  : [...prev, agent.id]
+                              );
+                            }}
+                            title={isPinned ? "Unpin from Sidebar" : "Pin to Sidebar"}
+                            className={`p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors ${isPinned ? "text-emerald-500" : "text-gray-400"}`}
+                          >
+                            <Star className="w-3.5 h-3.5 fill-current" style={{ fillOpacity: isPinned ? 1 : 0 }} />
+                          </button>
+                        </div>
+                        
+                        <p className="text-[10px] text-gray-400 dark:text-zinc-500 mt-2 line-clamp-2 min-h-[28px] font-medium leading-relaxed">
+                          {agent.instructions}
+                        </p>
+                        
+                        <div className="mt-3 flex justify-between items-center">
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500">Active</span>
+                          <button
+                            onClick={() => {
+                              setActiveAgentChatId(agent.id);
+                            }}
+                            className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>Chat</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-                {/* Chat Input */}
-                <div className="p-3 border-t border-gray-200 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Ask about portfolio risk or recovery deltas..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSendChatMessage();
+                  
+                  {/* Plus card to deploy new agent */}
+                  <button
+                    onClick={() => {
+                      setPreferencesActiveSection("ai_new_agent");
+                      setShowPreferencesModal(true);
+                      setIsSettingsDockedToSidebar(false);
                     }}
-                    className="flex-1 px-3 py-2 text-xs rounded-md border border-gray-200 dark:border-[#27272a] bg-white dark:bg-[#09090b] focus:ring-1 focus:ring-emerald-500 focus:outline-none"
-                  />
-                  <button 
-                    onClick={handleSendChatMessage}
-                    className="p-2 bg-emerald-500 hover:bg-emerald-600 rounded-md text-white cursor-pointer transition-colors"
+                    className="min-w-[150px] p-3 rounded-lg border border-dashed border-gray-300 dark:border-zinc-800 hover:border-emerald-500/50 bg-transparent flex flex-col items-center justify-center gap-1.5 flex-shrink-0 transition-colors cursor-pointer group"
                   >
-                    <Send className="w-4 h-4" />
+                    <Plus className="w-5 h-5 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                    <span className="text-[10px] font-bold text-gray-400 group-hover:text-emerald-500 transition-colors">Deploy Agent</span>
                   </button>
                 </div>
               </div>
 
-              {/* Generated Reports */}
-              <div className="w-[320px] h-full rounded-lg border border-gray-200 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col p-4 overflow-hidden">
-                <span className="font-bold text-sm mb-4">Analyst Reports</span>
-                <div className="flex-1 overflow-y-auto space-y-3">
-                  {[
-                    { title: "SUI vs BTC SVB Recovery Delta", desc: "Analyzes the 2.16x SUI multiplier during the SVB banking panic.", date: "June 13, 2026" },
-                    { title: "Portfolio Rebalancing Signal", desc: "Report on current holdings deviation from targets.", date: "June 12, 2026" },
-                    { title: "Multiplier Scenario Plan ($100K -> $3.6M)", desc: "Risk/reward assessment of target path distributions.", date: "June 10, 2026" }
-                  ].map((rep, idx) => {
-                    const isActive = selectedReport === idx;
-                    return (
-                      <div 
-                        key={idx}
-                        onClick={() => setSelectedReport(idx)}
-                        className={`p-3 rounded-md border cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors ${isActive ? "border-emerald-500 bg-white dark:bg-[#09090b]" : "border-gray-200 dark:border-[#27272a] bg-transparent"}`}
-                      >
-                        <span className="text-xs font-bold block">{rep.title}</span>
-                        <p className="text-[10px] text-gray-400 mt-1">{rep.desc}</p>
-                        <div className="flex justify-between items-center mt-2.5 text-[9px] text-gray-400">
-                          <span>{rep.date}</span>
-                          <BookOpen className="w-3 h-3" />
+              {/* Lower Section: Orchestrator Terminal & Reports */}
+              <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+                {/* Chat Console */}
+                <div className="flex-1 h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col overflow-hidden">
+                  <span className="font-bold text-sm p-4 border-b border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex justify-between items-center select-none">
+                    <span>Orchestrator Terminal</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">Main Hub</span>
+                  </span>
+                  
+                  {/* Message Log */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {messages.map((msg, idx) => {
+                      const isUser = msg.sender === "User";
+                      const isSystem = msg.sender === "System";
+                      return (
+                        <div key={idx} className={`flex w-full ${isUser ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[80%] p-3 rounded-lg border text-xs leading-relaxed ${isUser ? "bg-emerald-500/10 border-emerald-500 text-black dark:text-[#f4f4f5]" : isSystem ? "bg-zinc-100 dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-gray-400" : "bg-white dark:bg-[#09090b] border-gray-200 dark:border-[#27272a] text-black dark:text-[#f4f4f5]"}`}>
+                            <div className="flex items-center gap-1.5 font-bold mb-1 border-b border-gray-100 dark:border-zinc-800 pb-0.5">
+                              <span className={isUser ? "text-emerald-500" : "text-gray-400"}>{msg.sender}</span>
+                            </div>
+                            <p className="whitespace-pre-line font-medium">{msg.text}</p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Chat Input */}
+                  <div className="p-3 border-t border-gray-250 dark:border-[#27272a] bg-[#fafafa] dark:bg-[#121214] flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Ask Orchestrator to run portfolio queries or query sub-agents..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSendChatMessage();
+                      }}
+                      className="flex-1 px-3 py-2 text-xs rounded-md border border-gray-250 dark:border-[#27272a] bg-white dark:bg-[#09090b] focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    <button 
+                      onClick={handleSendChatMessage}
+                      className="p-2 bg-emerald-500 hover:bg-emerald-600 rounded-md text-white cursor-pointer transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Generated Reports */}
+                <div className="w-[320px] h-full rounded-lg border border-gray-250 dark:border-[#27272a] bg-gray-50 dark:bg-[#18181b] flex flex-col p-4 overflow-hidden">
+                  <span className="font-bold text-sm mb-4">Analyst Reports</span>
+                  <div className="flex-1 overflow-y-auto space-y-3">
+                    {[
+                      { title: "SUI vs BTC SVB Recovery Delta", desc: "Analyzes the 2.16x SUI multiplier during the SVB banking panic.", date: "June 13, 2026" },
+                      { title: "Portfolio Rebalancing Signal", desc: "Report on current holdings deviation from targets.", date: "June 12, 2026" },
+                      { title: "Multiplier Scenario Plan ($100K -> $3.6M)", desc: "Risk/reward assessment of target path distributions.", date: "June 10, 2026" }
+                    ].map((rep, idx) => {
+                      const isActive = selectedReport === idx;
+                      return (
+                        <div 
+                          key={idx}
+                          onClick={() => setSelectedReport(idx)}
+                          className={`p-3 rounded-md border cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors ${isActive ? "border-emerald-500 bg-white dark:bg-[#09090b]" : "border-gray-200 dark:border-[#27272a] bg-transparent"}`}
+                        >
+                          <span className="text-xs font-bold block">{rep.title}</span>
+                          <p className="text-[10px] text-gray-400 mt-1">{rep.desc}</p>
+                          <div className="flex justify-between items-center mt-2.5 text-[9px] text-gray-400">
+                            <span>{rep.date}</span>
+                            <BookOpen className="w-3 h-3" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -3921,104 +4235,125 @@ export default function App() {
             </div>
           )}
 
-        </main>
-      </div>
-
-      {/* Bottom Status Bar */}
-      <footer className={`flex h-8 w-full border-t justify-between items-center px-4 text-[11px] select-none text-gray-500 dark:text-[#a1a1aa] z-30 transition-all duration-200 ${tc.card} ${tc.border}`}>
-        {/* Left: Sector Selector Dropdown & Sector Tickers */}
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <button type="button" className={`flex items-center gap-1 font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${tc.badgeBg}`}>
-              <span>{selectedSector}</span>
-              <ChevronDown className="w-3 h-3 text-gray-400" />
-            </button>
-            
-            {/* Sector Dropdown Menu */}
-            <div className="absolute left-0 bottom-7 scale-0 group-hover:scale-100 origin-bottom-left transition-all w-32 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded shadow-xl p-1 z-50 flex flex-col gap-0.5">
-              {(["Layer 1", "Layer 2", "Memes", "DePIN"] as const).map((sec) => (
-                <button
-                  key={sec}
-                  type="button"
-                  onClick={() => setSelectedSector(sec)}
-                  className={`w-full text-left px-2 py-1 rounded text-[10px] font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 ${
-                    selectedSector === sec ? "text-emerald-500 bg-emerald-500/5 font-bold" : "text-gray-600 dark:text-zinc-300"
-                  }`}
-                >
-                  {sec}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Sector Ticker Lists */}
-          <div className="hidden sm:flex items-center gap-4 border-l border-gray-200 dark:border-zinc-800 pl-4">
-            {sectorData[selectedSector].map((ticker) => {
-              const tickerUp = quoteColorUpGreen ? ticker.up : !ticker.up;
-              const colClass = tickerUp ? "text-emerald-500" : "text-rose-500";
-              return (
-                <div key={ticker.sym} className="flex items-center gap-1.5 font-medium">
-                  <span className="font-bold text-black dark:text-white">{ticker.sym}</span>
-                  <span className="font-semibold">{ticker.val}</span>
-                  <span className={`font-bold ${colClass}`}>{ticker.chg}</span>
-                  <span className={`font-bold ${colClass}`}>{ticker.pct}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+         </main>
         
-        {/* Right: Timezone, Connection Indicator, Refresh */}
-        <div className="flex items-center gap-4">
-          {/* Clock & Timezone selector */}
-          <div className="relative group">
-            <button type="button" className="flex items-center gap-1 font-semibold hover:text-black dark:hover:text-white cursor-pointer transition-colors">
-              <span>{currentTime || "Loading..."}</span>
-            </button>
-            {/* Timezone dropdown selector */}
-            <div className="absolute right-0 bottom-7 scale-0 group-hover:scale-100 origin-bottom-right transition-all w-28 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded shadow-xl p-1 z-50 flex flex-col gap-0.5">
-              {(["Local", "UTC", "EST", "PST"] as const).map((tz) => (
+        {/* Bottom Status Bar */}
+        <footer className={`flex h-8 w-full border-t justify-between items-center px-4 text-[11px] select-none text-gray-500 dark:text-[#a1a1aa] z-30 transition-all duration-200 flex-shrink-0 ${tc.card} ${tc.border}`}>
+          {/* Left: Sector Selector Dropdown & Sector Tickers */}
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <button type="button" className={`flex items-center gap-1 font-bold px-2 py-0.5 rounded cursor-pointer transition-colors ${tc.badgeBg}`}>
+                <span>{selectedSector}</span>
+                <ChevronDown className="w-3 h-3 text-gray-400" />
+              </button>
+              
+              {/* Sector Dropdown Menu */}
+              <div className="absolute left-0 bottom-7 scale-0 group-hover:scale-100 origin-bottom-left transition-all w-26 bg-white dark:bg-[#18181b] border border-gray-405 dark:border-zinc-700 rounded shadow-xl p-1.5 z-50 flex flex-col gap-0.5">
+                {sectorsList.map((sec) => (
+                  <button
+                    key={sec}
+                    type="button"
+                    onClick={() => setSelectedSector(sec)}
+                    className={`w-full text-left px-2 py-1 rounded text-[13px] font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 ${
+                      selectedSector === sec ? "text-emerald-500 bg-emerald-500/5 font-bold" : "text-gray-600 dark:text-zinc-300"
+                    }`}
+                  >
+                    {sec}
+                  </button>
+                ))}
+                
+                {/* Plus button to add custom category */}
                 <button
-                  key={tz}
                   type="button"
-                  onClick={() => setSelectedTimezone(tz)}
-                  className={`w-full text-left px-2 py-1 rounded text-[10px] font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 ${
-                    selectedTimezone === tz ? "text-emerald-500 bg-emerald-500/5 font-bold" : "text-gray-600 dark:text-zinc-300"
-                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const name = prompt("Enter new category name:");
+                    if (name && name.trim()) {
+                      const cleanName = name.trim();
+                      if (!sectorsList.includes(cleanName)) {
+                        setSectorsList(prev => [...prev, cleanName]);
+                        setSelectedSector(cleanName);
+                      }
+                    }
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded text-[11px] font-bold text-emerald-500 hover:bg-emerald-500/10 flex items-center gap-1 cursor-pointer border-t border-gray-200 dark:border-zinc-800/80 mt-1"
                 >
-                  {tz === "Local" ? "Local Time" : tz}
+                  <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Add Category</span>
                 </button>
-              ))}
+              </div>
+            </div>
+            
+            {/* Sector Ticker Lists */}
+            <div className="hidden sm:flex items-center gap-4 border-l border-gray-200 dark:border-zinc-800 pl-4">
+              {(sectorData[selectedSector as keyof typeof sectorData] || sectorData["Layer 1"]).map((ticker) => {
+                const tickerUp = quoteColorUpGreen ? ticker.up : !ticker.up;
+                const colClass = tickerUp ? "text-emerald-500" : "text-rose-500";
+                return (
+                  <div key={ticker.sym} className="flex items-center gap-1.5 font-medium">
+                    <span className="font-bold text-black dark:text-white">{ticker.sym}</span>
+                    <span className="font-semibold">{ticker.val}</span>
+                    <span className={`font-bold ${colClass}`}>{ticker.chg}</span>
+                    <span className={`font-bold ${colClass}`}>{ticker.pct}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
           
-          {/* Connection Indicator */}
-          <div className="flex items-center gap-1.5">
+          {/* Right: Timezone, Connection Indicator, Refresh */}
+          <div className="flex items-center gap-4">
+            {/* Clock & Timezone selector */}
+            <div className="relative group">
+              <button type="button" className="flex items-center gap-1 font-semibold hover:text-black dark:hover:text-white cursor-pointer transition-colors">
+                <span>{currentTime || "Loading..."}</span>
+              </button>
+              {/* Timezone dropdown selector */}
+              <div className="absolute right-0 bottom-7 scale-0 group-hover:scale-100 origin-bottom-right transition-all w-28 bg-white dark:bg-[#18181b] border border-gray-200 dark:border-[#27272a] rounded shadow-xl p-1 z-50 flex flex-col gap-0.5">
+                {(["Local", "UTC", "EST", "PST"] as const).map((tz) => (
+                  <button
+                    key={tz}
+                    type="button"
+                    onClick={() => setSelectedTimezone(tz)}
+                    className={`w-full text-left px-2 py-1 rounded text-[10px] font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800 ${
+                      selectedTimezone === tz ? "text-emerald-500 bg-emerald-500/5 font-bold" : "text-gray-600 dark:text-zinc-300"
+                    }`}
+                  >
+                    {tz === "Local" ? "Local Time" : tz}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Connection Indicator */}
+            <div className="flex items-center gap-1.5">
+              <button 
+                type="button"
+                onClick={() => setConnectionStatus(prev => prev === "Connected" ? "Disconnected" : "Connected")}
+                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <span className={`w-2 h-2 rounded-full inline-block relative ${connectionStatus === "Connected" ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-rose-500 shadow-[0_0_8px_#f43f5e]"}`}>
+                  {connectionStatus === "Connected" && <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />}
+                </span>
+                <span className="font-bold text-[10px]">{connectionStatus === "Connected" ? "China Mainland" : "Disconnected"}</span>
+              </button>
+            </div>
+            
+            {/* Refresh Button */}
             <button 
               type="button"
-              onClick={() => setConnectionStatus(prev => prev === "Connected" ? "Disconnected" : "Connected")}
-              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+              onClick={() => {
+                setConnectionStatus("Connected");
+              }}
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-gray-400 hover:text-black dark:hover:text-white"
+              title="Refresh Quotes"
             >
-              <span className={`w-2 h-2 rounded-full inline-block relative ${connectionStatus === "Connected" ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-rose-500 shadow-[0_0_8px_#f43f5e]"}`}>
-                {connectionStatus === "Connected" && <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />}
-              </span>
-              <span className="font-bold text-[10px]">{connectionStatus === "Connected" ? "China Mainland" : "Disconnected"}</span>
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
-          
-          {/* Refresh Button */}
-          <button 
-            type="button"
-            onClick={() => {
-              setConnectionStatus("Connected");
-            }}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-gray-400 hover:text-black dark:hover:text-white"
-            title="Refresh Quotes"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </footer>
+        </footer>
+      </div> {/* Closing Right side container */}
+    </div> {/* Closing Main Container */}
 
       {/* Preferences Modal Overlay */}
       {showPreferencesModal && (
@@ -4043,7 +4378,7 @@ export default function App() {
               height: isModalMaximized ? "100%" : `${preferencesModalHeight}px`,
               transition: (isModalBeingDragged || isModalBeingResized) ? "none" : "transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), width 0.35s cubic-bezier(0.25, 1, 0.5, 1), height 0.35s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease"
             }}
-            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 relative ${
+            className={`bg-white dark:bg-[#18181b] shadow-2xl flex flex-col overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 relative ${
               (isModalMinimized || isSettingsDockedToSidebar)
                 ? "opacity-0 pointer-events-none"
                 : isModalMaximized 
@@ -4051,45 +4386,17 @@ export default function App() {
                   : "border border-gray-300 dark:border-[#27272a] rounded-xl"
             }`}
           >
-            {/* Left Sidebar inside preferences modal */}
+            {/* macOS-style Header / Grab Handle for dragging */}
             <div 
-              style={{ width: isSettingsSidebarCollapsed ? "52px" : `${settingsSidebarWidth}px`, minWidth: isSettingsSidebarCollapsed ? "52px" : "160px" }}
-              className="bg-gray-50 dark:bg-[#121214] border-r border-gray-200 dark:border-[#27272a] flex flex-col select-none text-xs relative flex-shrink-0"
+              onMouseDown={handleModalDragStart}
+              className="h-10 border-b border-gray-100 dark:border-[#27272a] bg-gray-50 dark:bg-[#121214] flex items-center justify-between px-4 select-none cursor-grab active:cursor-grabbing flex-shrink-0 relative"
             >
-              {/* Collapse toggle button */}
-              <button
-                type="button"
-                onClick={() => setIsSettingsSidebarCollapsed(prev => !prev)}
-                title={isSettingsSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 flex items-center justify-center shadow-sm hover:bg-gray-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-gray-500">
-                  {isSettingsSidebarCollapsed 
-                    ? <><polyline points="9 18 15 12 9 6"></polyline></>
-                    : <><polyline points="15 18 9 12 15 6"></polyline></>
-                  }
-                </svg>
-              </button>
-              {/* Resize drag handle — 4px hit zone at the very right edge, only when expanded */}
-              {!isSettingsSidebarCollapsed && (
-                <div
-                  onMouseDown={handleSettingsSidebarDragStart}
-                  className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize z-30 group/rhandle"
-                  style={{ cursor: "col-resize" }}
-                >
-                  <div className="absolute inset-0 hover:bg-emerald-500/30 active:bg-emerald-500/50 transition-colors" />
-                </div>
-              )}
-              <div
-                onMouseDown={handleModalDragStart}
-                className={`flex flex-col flex-1 overflow-hidden cursor-grab active:cursor-grabbing ${isSettingsSidebarCollapsed ? "p-2 pt-4 items-center" : "p-4 pr-3"}`}
-              >
-              {/* macOS Traffic Lights top-left */}
-              <div className={`flex gap-2 mb-5 items-center group/lights flex-shrink-0 ${isSettingsSidebarCollapsed ? "justify-center" : ""}`}>
+              {/* Left side: Traffic Lights */}
+              <div className="flex gap-1.5 items-center group/lights">
                 <button 
                   type="button"
                   onClick={() => { setShowPreferencesModal(false); setIsModalMaximized(false); setIsSettingsDockedToSidebar(false); setModalOffset({ x: 0, y: 0 }); }} 
-                  style={{ width: "12px", height: "12px", flexShrink: 0 }}
+                  style={{ width: "12px", height: "12px" }}
                   className="rounded-full bg-[#ff5f56] flex items-center justify-center border border-[#e0443e] cursor-pointer relative transition-all"
                   title="Close Settings (Escape)"
                 >
@@ -4098,49 +4405,87 @@ export default function App() {
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                   </svg>
                 </button>
-                {!isSettingsSidebarCollapsed && (
-                  <>
-                    <button 
-                      type="button"
-                      onClick={() => setIsModalMinimized(true)}
-                      style={{ width: "12px", height: "12px" }}
-                      className="rounded-full bg-[#ffbd2e] flex items-center justify-center border border-[#dca124] cursor-pointer relative transition-all"
-                      title="Minimize Settings"
-                    >
-                      <svg className="w-2 h-0.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#5c3e00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                      </svg>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => { setIsModalMaximized(prev => !prev); if (!isModalMaximized) setModalOffset({ x: 0, y: 0 }); }}
-                      style={{ width: "12px", height: "12px" }}
-                      className="rounded-full bg-[#27c93f] flex items-center justify-center border border-[#1a9c2b] cursor-pointer relative transition-all"
-                      title={isModalMaximized ? "Restore Window Size" : "Maximize Settings"}
-                    >
-                      <svg className="w-1.5 h-1.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#003300]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="15 3 21 3 21 9"></polyline>
-                        <polyline points="9 21 3 21 3 15"></polyline>
-                        <line x1="21" y1="3" x2="3" y2="21"></line>
-                      </svg>
-                    </button>
-                  </>
-                )}
+                <button 
+                  type="button"
+                  onClick={() => setIsModalMinimized(true)}
+                  style={{ width: "12px", height: "12px" }}
+                  className="rounded-full bg-[#ffbd2e] flex items-center justify-center border border-[#dca124] cursor-pointer relative transition-all"
+                  title="Minimize Settings"
+                >
+                  <svg className="w-2 h-0.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#5c3e00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setIsModalMaximized(prev => !prev); if (!isModalMaximized) setModalOffset({ x: 0, y: 0 }); }}
+                  style={{ width: "12px", height: "12px" }}
+                  className="rounded-full bg-[#27c93f] flex items-center justify-center border border-[#1a9c2b] cursor-pointer relative transition-all"
+                  title={isModalMaximized ? "Restore Window Size" : "Maximize Settings"}
+                >
+                  <svg className="w-1.5 h-1.5 opacity-0 group-hover/lights:opacity-100 transition-opacity text-[#003300]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <polyline points="9 21 3 21 3 15"></polyline>
+                    <line x1="21" y1="3" x2="3" y2="21"></line>
+                  </svg>
+                </button>
               </div>
-              
-              {/* Search input box — hidden when collapsed */}
-              {!isSettingsSidebarCollapsed && (
-                <div className="mb-4 relative">
-                  <input 
-                    type="text" 
-                    placeholder="Search..."
-                    value={settingsSearchQuery}
-                    onChange={(e) => setSettingsSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
-                </div>
-              )}
+
+              {/* Title */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-semibold text-[11px] text-gray-500 dark:text-zinc-400 tracking-wide">
+                {getPreferencesSectionTitle()}
+              </div>
+
+              {/* Empty right area to balance */}
+              <div className="w-[60px]" />
+            </div>
+
+            {/* Main content body container */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Left Sidebar inside preferences modal */}
+              <div 
+                style={{ width: isSettingsSidebarCollapsed ? "52px" : `${settingsSidebarWidth}px`, minWidth: isSettingsSidebarCollapsed ? "52px" : "160px" }}
+                className="bg-gray-50 dark:bg-[#121214] border-r border-gray-200 dark:border-[#27272a] flex flex-col select-none text-xs relative flex-shrink-0"
+              >
+                {/* Collapse toggle button */}
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsSidebarCollapsed(prev => !prev)}
+                  title={isSettingsSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 flex items-center justify-center shadow-sm hover:bg-gray-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-gray-500">
+                    {isSettingsSidebarCollapsed 
+                      ? <><polyline points="9 18 15 12 9 6"></polyline></>
+                      : <><polyline points="15 18 9 12 15 6"></polyline></>
+                    }
+                  </svg>
+                </button>
+                {/* Resize drag handle — 4px hit zone at the very right edge, only when expanded (NO GREEN HIGHLIGHT) */}
+                {!isSettingsSidebarCollapsed && (
+                  <div
+                    onMouseDown={handleSettingsSidebarDragStart}
+                    className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize z-30"
+                    style={{ cursor: "col-resize" }}
+                  >
+                    <div className="absolute inset-0 bg-transparent" />
+                  </div>
+                )}
+                
+                <div className={`flex flex-col flex-1 overflow-hidden ${isSettingsSidebarCollapsed ? "p-2 pt-4 items-center" : "p-4 pr-3"}`}>
+                  {/* Search input box — hidden when collapsed */}
+                  {!isSettingsSidebarCollapsed && (
+                    <div className="mb-4 relative">
+                      <input 
+                        type="text" 
+                        placeholder="Search..."
+                        value={settingsSearchQuery}
+                        onChange={(e) => setSettingsSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs rounded bg-white dark:bg-[#09090b] border border-gray-200 dark:border-[#27272a] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                    </div>
+                  )}
               
               {/* Navigation list */}
               <div className="flex-1 overflow-y-auto space-y-1 pr-1">
@@ -4417,13 +4762,13 @@ export default function App() {
                 {/* Right Edge handle */}
                 <div 
                   onMouseDown={(e) => handleModalResizeStart(e, "width")}
-                  className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[1000] hover:bg-emerald-500/20 active:bg-emerald-500/40 transition-colors"
+                  className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-[1000] bg-transparent"
                   title="Drag to resize width"
                 />
                 {/* Bottom Edge handle */}
                 <div 
                   onMouseDown={(e) => handleModalResizeStart(e, "height")}
-                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize z-[1000] hover:bg-emerald-500/20 active:bg-emerald-500/40 transition-colors"
+                  className="absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize z-[1000] bg-transparent"
                   title="Drag to resize height"
                 />
                 {/* Bottom-right Corner handle */}
@@ -4434,6 +4779,7 @@ export default function App() {
                 />
               </>
             )}
+            </div>
           </div>
         </div>
       )}

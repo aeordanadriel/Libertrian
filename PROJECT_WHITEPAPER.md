@@ -242,3 +242,33 @@ Completely removed Trade Preferences, restructured AI settings to support nested
 - **API Ingestion Coordinator Router:** Replaced simple DB configuration forms inside Developer settings with a premium Ingestion Coordinator. Categorizes API inputs (Market Data, Exchanges, Banks, Databases), lists current active API providers with connection badges, features a dynamic connection registration form, and renders a live flowing animated path map.
 - **Strict Compilation & Drag Offset Fix:** Fixed a coordinate Y-axis jumping bug by correctly referencing `modalOffsetRef.current.y` (instead of previous dragOffset) during drag triggers. Removed all unused React imports (`FileSpreadsheet`, `SquareArrowOutUpRight`) and local states to achieve clean builds under `noUnusedLocals: true` parameters.
 
+---
+
+## Entry 10 — AI Agent Dashboard, Sidebar Pinning, Full-Height Sidebar Layout & Category Extensions
+
+**Date:** 2026-06-14
+**Developer:** Antigravity (AI)
+**IDE:** Gemini Agent Sandbox
+**Model:** Gemini 3.5 Flash (Medium) | **Effort:** High
+
+### Summary
+Redesigned the application layout to support a full-height left navigation sidebar, added an AI Agent Dashboard with sidebar-docking / 1-on-1 custom chat consoles, implemented a collapsible and resizable settings sidebar inside the preferences modal, added resizable map heights to the Ingestion Coordinator, enabled dynamic category registration in the status bar, and polished various UI components.
+
+### Technical Details
+- **Full-Height Left Sidebar:** Moved the index status bar (footer) into the right-hand layout container flex column so the navigation sidebar stretches to the bottom of the viewport. Lifted the mascot and theme buttons (10–15% padding adjustment) and added a short horizontal separator (`w-8`) directly above the avatar.
+- **AI Agent Dashboard & Pinning:**
+  - Upgraded the AI Analyst tab to show a horizontal scrollable row of deployed AI agents with active "Pin to Sidebar" bookmark toggles.
+  - Implemented `pinnedAgentIds` and `activeAgentChatId` state values to mount dedicated 1-on-1 workspaces for pinned agents on the right, overriding the default active tab layout.
+  - Added a "Danger Zone" in the Agent Config settings panel to permanently delete custom agents.
+- **Preferences Modal Header Sync:** Configured the preferences header title bar to dynamically resolve and show the active section name (e.g., "Account Preferences", "Sarah Settings", "Ingestions Router") instead of defaulting to a static "Preferences".
+- **Transparent Drag/Resize overlays:** Removed the green highlight overlay styling from settings window drag handles, making the resize zones fully transparent while keeping dragging/resizing functional.
+- **Resizable Settings Sidebar & Collapse:**
+  - Added a vertical col-resize drag handle on the right edge of the settings panel navigation sidebar, clamping width adjustments between `160px` and `350px`.
+  - Added an expand/collapse toggle (`◀/▶`) button that shrinks the sidebar down to a 52px icon-only mode when collapsed.
+- **Resizable Ingestion Coordinator Map:**
+  - Integrated a row-resize drag handle at the bottom edge of the coordinator map.
+  - Bound mouse dragging event listeners to update `mapHeight` (clamped between `160px` and `450px`).
+  - Disabled CSS transition styling on the map height *only* during active dragging to ensure smooth resizing.
+- **Real-Time SVG Flows & Extensions:**
+  - Connected lines dynamically using custom coordinate bounding boxes. Muted gray lines are drawn when a category has 0 active connections; glowing green flow packet animations are activated only for active connections.
+  - Status bar category filter has a narrower dropdown (`w-26`), darker border styling, and a `+ Add Category` button that dynamically appends to `sectorsList` state. Added TypeScript fallback indexing checks on `sectorData` to prevent runtime crashes.
