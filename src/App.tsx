@@ -804,7 +804,8 @@ export default function App() {
       target.closest("select") || 
       target.closest("textarea") ||
       target.closest("a") ||
-      target.classList.contains("cursor-pointer")
+      target.closest("nav") ||
+      target.closest(".category-box-node")
     ) {
       return;
     }
@@ -3969,12 +3970,12 @@ export default function App() {
                   : `translate(${modalOffset.x}px, ${modalOffset.y}px)`,
               transition: isDraggingModal.current ? "none" : "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)"
             }}
-            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 transition-all duration-300 ${
+            className={`bg-white dark:bg-[#18181b] shadow-2xl flex overflow-hidden text-[#0f0f0f] dark:text-[#f4f4f5] z-10 transition-all duration-300 resize overflow-auto ${
               isModalMinimized
                 ? "opacity-0 pointer-events-none"
                 : isModalMaximized 
-                  ? "w-full h-full rounded-none border-none" 
-                  : "w-[90vw] max-w-[1000px] h-[85vh] max-h-[720px] border border-gray-300 dark:border-[#27272a] rounded-xl"
+                  ? "w-full h-full rounded-none border-none resize-none" 
+                  : "w-[90vw] max-w-[1000px] h-[85vh] max-h-[720px] min-w-[400px] min-h-[300px] border border-gray-300 dark:border-[#27272a] rounded-xl"
             }`}
           >
             {/* Left Sidebar inside preferences modal */}
